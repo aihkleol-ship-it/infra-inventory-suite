@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InfraGateway - Secured</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['"JetBrains Mono"', 'monospace'] }, colors: { slate: { 850: '#1e293b', 900: '#0f172a', 950: '#020617' } } } }
+        }
+    </script>
+    <style>body { background-color: #0f172a; color: #e2e8f0; }</style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function LoginView({ onLogin }) {
+            const [user, setUser] = useState("");
+            const [pass, setPass] = useState("");
+            const [error, setError] = useState("");
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                axios.post('api/admin.php', { action: 'login', username: user, password: pass })
+                    .then(res => onLogin(res.data.user))
+                    .catch(() => setError("Invalid Credentials"));
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center">
+                    <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 w-full max-w-sm shadow-2xl">
+                        <div className="flex justify-center mb-6 text-blue-500 text-4xl"><i className="ph ph-shield-check"></i></div>
+                        <h2 className="text-xl font-bold text-center text-white mb-6">Gateway Admin</h2>
+                        {error && <div className="bg-red-500/10 text-red-400 p-3 rounded mb-4 text-sm text-center border border-red-500/20">{error}</div>}
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Username</label><input autoFocus className="w-full bg-slate-950 border border-slate-700 rounded p-2.5 text-sm focus:border-blue-500 outline-none" value={user} onChange={e=>setUser(e.target.value)} /></div>
+                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label><input type="password" className="w-full bg-slate-950 border border-slate-700 rounded p-2.5 text-sm focus:border-blue-500 outline-none" value={pass} onChange={e=>setPass(e.target.value)} /></div>
+                            <button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded transition-colors">Access Console</button>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        function NavItem({ active, icon, label, onClick }) {
+            return (
+                <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${active ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                    <i className={`ph ${icon} text-lg`}></i> {label}
+                </button>
+            );
+        }
+
+        function ClientsView({ clients, onRefresh }) {
+            const createClient = (e) => {
+                e.preventDefault();
+                const name = prompt("Enter Application Name:");
+                if(name) axios.post('api/admin.php', {action: 'create_client', name}).then(onRefresh);
+            };
+            const revokeClient = (id) => { if(confirm("Revoke?")) axios.post('api/admin.php', {action: 'revoke_client', id}).then(onRefresh); };
+
+            return (
+                <div className="p-8 max-w-5xl mx-auto animate-fade-in">
+                    <div className="flex justify-between items-center mb-8">
+                        <div><h2 className="text-2xl font-bold text-white">API Clients</h2><p className="text-slate-400 text-sm">Manage access keys.</p></div>
+                        <button onClick={createClient} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2"><i className="ph ph-plus"></i> New Client</button>
+                    </div>
+                    <div className="grid gap-4">
+                        {clients.map(c => (
+                            <div key={c.id} className="bg-slate-800 p-6 rounded-xl border border-slate-700 flex justify-between items-center">
+                                <div>
+                                    <div className="flex items-center gap-3 mb-1"><h3 className="font-bold text-lg">{c.app_name}</h3><span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${c.status==='active'?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'}`}>{c.status}</span></div>
+                                    <div className="flex items-center gap-2 text-slate-400 text-xs font-mono bg-slate-900/50 px-2 py-1 rounded"><span>Key:</span> <span className="text-yellow-400">{c.api_key}</span><button onClick={()=>navigator.clipboard.writeText(c.api_key)} className="hover:text-white"><i className="ph ph-copy"></i></button></div>
+                                </div>
+                                {c.status==='active' && <button onClick={()=>revokeClient(c.id)} className="text-red-400 text-xs hover:text-red-300 font-bold border border-red-900/50 px-3 py-1.5 rounded hover:bg-red-900/20">Revoke</button>}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+        
+        function UsersView({ admins, currentUser, onRefresh }) {
+            const createAdmin = () => {
+                const u = prompt("New Admin Username:");
+                if(!u) return;
+                const p = prompt("New Admin Password:");
+                if(!p) return;
+                axios.post('api/admin.php', {action: 'create_admin', username: u, password: p})
+                    .then(onRefresh).catch(e => alert(e.response?.data?.message || "Error"));
+            };
+            
+            const deleteAdmin = (id) => {
+                if(confirm("Delete this admin user?")) {
+                    axios.post('api/admin.php', {action: 'delete_admin', id})
+                        .then(onRefresh).catch(e => alert(e.response?.data?.message || "Error"));
+                }
+            };
+
+            const resetPassword = (id) => {
+                const p = prompt("Enter new password:");
+                if(p) {
+                    axios.post('api/admin.php', {action: 'update_password', id, password: p})
+                        .then(() => alert("Password updated successfully"))
+                        .catch(e => alert("Error updating password"));
+                }
+            };
+
+            return (
+                <div className="p-8 max-w-5xl mx-auto animate-fade-in">
+                    <div className="flex justify-between items-center mb-8">
+                        <div><h2 className="text-2xl font-bold text-white">Access Control</h2><p className="text-slate-400 text-sm">Manage gateway administrators.</p></div>
+                        <button onClick={createAdmin} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2"><i className="ph ph-user-plus"></i> Add Admin</button>
+                    </div>
+                    <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-900 text-slate-400 uppercase text-xs"><tr><th className="p-4">Username</th><th className="p-4">Created At</th><th className="p-4 text-right">Actions</th></tr></thead>
+                            <tbody className="divide-y divide-slate-700">
+                                {admins.map(a => (
+                                    <tr key={a.id} className="hover:bg-slate-700/50">
+                                        <td className="p-4 font-bold text-white flex items-center gap-2">
+                                            <i className="ph ph-user-circle text-lg text-slate-400"></i> {a.username}
+                                            {a.id == currentUser.id && <span className="bg-blue-500/20 text-blue-400 text-[10px] px-1.5 py-0.5 rounded ml-2">YOU</span>}
+                                        </td>
+                                        <td className="p-4 text-slate-400">{a.created_at}</td>
+                                        <td className="p-4 text-right space-x-2">
+                                            <button onClick={()=>resetPassword(a.id)} className="text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-600 transition-colors">Reset Pass</button>
+                                            {a.id != currentUser.id && (
+                                                <button onClick={()=>deleteAdmin(a.id)} className="text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-900/20 transition-colors">Delete</button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        function ConfigView({ config, onRefresh }) {
+            const [form, setForm] = useState(config || {});
+            useEffect(() => setForm(config || {}), [config]);
+            const save = (e) => { e.preventDefault(); axios.post('api/admin.php', {action: 'save_smtp', ...form}).then(() => { alert("Saved!"); onRefresh(); }).catch(e => alert(e.response?.data?.message)); };
+
+            return (
+                <div className="p-8 max-w-2xl mx-auto animate-fade-in">
+                    <h2 className="text-2xl font-bold text-white mb-6">SMTP Configuration</h2>
+                    <div className="bg-slate-800 p-8 rounded-xl border border-slate-700">
+                        <form onSubmit={save} className="space-y-5">
+                            <div className="grid grid-cols-2 gap-5">
+                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Host</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.host||''} onChange={e=>setForm({...form, host:e.target.value})} /></div>
+                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Port</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.port||''} onChange={e=>setForm({...form, port:e.target.value})} /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-5">
+                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Username</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.user||''} onChange={e=>setForm({...form, user:e.target.value})} /></div>
+                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Password</label><input type="password" className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.pass||''} onChange={e=>setForm({...form, pass:e.target.value})} placeholder="••••••" /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-5">
+                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Encryption</label><select className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.encryption||'tls'} onChange={e=>setForm({...form, encryption:e.target.value})}><option value="tls">TLS</option><option value="ssl">SSL</option><option value="">None</option></select></div>
+                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">From Name</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.from_name||''} onChange={e=>setForm({...form, from_name:e.target.value})} /></div>
+                            </div>
+                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">From Email</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.from_email||''} onChange={e=>setForm({...form, from_email:e.target.value})} /></div>
+                            <button className="w-full bg-blue-600 text-white font-bold py-3 rounded hover:bg-blue-500">Update Settings</button>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        function LogsView({ logs }) {
+            return (
+                <div className="p-8 max-w-6xl mx-auto animate-fade-in">
+                    <h2 className="text-2xl font-bold text-white mb-6">Traffic Logs</h2>
+                    <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                        <table className="w-full text-sm text-left"><thead className="bg-slate-900 text-slate-400 uppercase text-xs"><tr><th className="p-4">Time</th><th className="p-4">App</th><th className="p-4">Recipient</th><th className="p-4">Subject</th><th className="p-4">Status</th></tr></thead>
+                        <tbody className="divide-y divide-slate-700">{logs.map(l=>(<tr key={l.id} className="hover:bg-slate-700/50"><td className="p-4 text-slate-400 font-mono text-xs">{l.created_at}</td><td className="p-4 font-bold text-white">{l.app_name||'Unknown'}</td><td className="p-4 text-slate-300">{l.recipient}</td><td className="p-4 text-slate-300">{l.subject}</td><td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold ${l.status==='success'?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'}`}>{l.status}</span></td></tr>))}</tbody></table>
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('clients');
+            const [data, setData] = useState({ clients: [], logs: [], config: {}, admins: [] });
+
+            const fetchData = () => {
+                axios.get('api/admin.php')
+                    .then(res => setData(res.data))
+                    .catch(err => {
+                        if(err.response && err.response.status === 401) setUser(null);
+                    });
+            };
+
+            useEffect(() => {
+                // Initial check
+                axios.get('api/admin.php?check_auth=1').then(res => {
+                    if(res.data.authenticated) {
+                        setUser({username: res.data.username, id: res.data.id});
+                        fetchData();
+                    }
+                }).catch(() => setUser(null));
+            }, []);
+
+            useEffect(() => { if(user) fetchData(); }, [user, view]);
+
+            const handleLogout = () => {
+                axios.post('api/admin.php', { action: 'logout' }).then(() => setUser(null));
+            };
+
+            if (!user) return <LoginView onLogin={(u) => { setUser(u); fetchData(); }} />;
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col shrink-0">
+                        <div className="p-6 flex items-center gap-3 text-white border-b border-slate-800"><i className="ph ph-paper-plane-tilt text-2xl text-blue-500"></i><span className="font-bold text-lg tracking-tight">InfraGateway</span></div>
+                        <nav className="flex-1 p-4 space-y-2">
+                            <NavItem active={view==='clients'} icon="ph-app-window" label="API Clients" onClick={()=>setView('clients')} />
+                            <NavItem active={view==='config'} icon="ph-gear" label="SMTP Config" onClick={()=>setView('config')} />
+                            <NavItem active={view==='admins'} icon="ph-users" label="Admin Users" onClick={()=>setView('admins')} />
+                            <NavItem active={view==='logs'} icon="ph-list-dashes" label="Traffic Logs" onClick={()=>setView('logs')} />
+                        </nav>
+                        <div className="p-4 border-t border-slate-800"><div className="text-xs text-slate-400 mb-2">Logged in as {user.username}</div><button onClick={handleLogout} className="text-xs text-red-400 hover:text-red-300">Sign Out</button></div>
+                    </aside>
+                    <main className="flex-1 overflow-auto bg-slate-900 text-slate-200">
+                        {view === 'clients' && <ClientsView clients={data.clients} onRefresh={fetchData} />}
+                        {view === 'admins' && <UsersView admins={data.admins} currentUser={user} onRefresh={fetchData} />}
+                        {view === 'config' && <ConfigView config={data.config} onRefresh={fetchData} />}
+                        {view === 'logs' && <LogsView logs={data.logs} />}
+                    </main>
+                </div>
+            );
+        }
+        const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<App />);
+    </script>
+</body>
+</html>

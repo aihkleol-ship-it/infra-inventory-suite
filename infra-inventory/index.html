@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InfraInventory V6.0</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Axios -->
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'media',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#312e81' },
+                        slate: { 750: '#2d3748', 850: '#1a202c', 900: '#111827', 950: '#020617' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .table-container::-webkit-scrollbar { width: 6px; height: 6px; }
+        .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        @media (prefers-color-scheme: dark) { .table-container::-webkit-scrollbar-thumb { background: #475569; } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-f8fafc dark:bg-slate-950 dark:text-slate-200 transition-colors duration-200">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- HOOKS & TOASTS ---
+        function useDarkMode() {
+            const [isDark, setIsDark] = useState(window.matchMedia('(prefers-color-scheme: dark)').matches);
+            useEffect(() => {
+                const matcher = window.matchMedia('(prefers-color-scheme: dark)');
+                const handler = e => setIsDark(e.matches);
+                matcher.addEventListener('change', handler);
+                return () => matcher.removeEventListener('change', handler);
+            }, []);
+            return isDark;
+        }
+
+        const ToastContext = React.createContext();
+        function ToastProvider({ children }) {
+            const [toasts, setToasts] = useState([]);
+            const addToast = (msg, type = 'info') => {
+                const id = Date.now();
+                setToasts(prev => [...prev, { id, msg, type }]);
+                setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+            };
+            return (
+                <ToastContext.Provider value={addToast}>
+                    {children}
+                    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+                        {toasts.map(t => (
+                            <div key={t.id} className={`pointer-events-auto px-4 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 animate-fade-in ${t.type==='error'?'bg-red-500 text-white':'bg-slate-800 dark:bg-slate-700 text-white'}`}>
+                                <i className={`ph ${t.type==='error'?'ph-warning-circle':'ph-check-circle'} text-lg`}></i> {t.msg}
+                            </div>
+                        ))}
+                    </div>
+                </ToastContext.Provider>
+            );
+        }
+        const useToast = () => React.useContext(ToastContext);
+
+        // --- COMPONENTS ---
+        function SimpleChart({ type, data, options }) {
+            const canvasRef = useRef(null); const chartRef = useRef(null);
+            useEffect(() => {
+                if (!canvasRef.current) return;
+                if (chartRef.current) chartRef.current.destroy();
+                chartRef.current = new Chart(canvasRef.current, { type, data, options });
+                return () => { if (chartRef.current) chartRef.current.destroy(); };
+            }, [data, type, options]);
+            return <canvas ref={canvasRef} />;
+        }
+
+        const getEOSMeta = (dateStr) => {
+            if (!dateStr) return { class: 'text-slate-400 dark:text-slate-500', label: 'N/A', isRisk: false };
+            const diffDays = Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
+            if (isNaN(diffDays)) return { class: 'text-slate-400 dark:text-slate-500', label: 'Invalid', isRisk: false };
+            if (diffDays < 0) return { class: 'text-red-600 bg-red-50 border border-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-900/50 font-bold px-2 py-0.5 rounded text-xs font-mono', label: dateStr, isRisk: true };
+            if (diffDays < 548) return { class: 'text-amber-600 bg-amber-50 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-900/50 font-bold px-2 py-0.5 rounded text-xs font-mono', label: dateStr, isRisk: true };
+            return { class: 'text-emerald-600 dark:text-emerald-400 text-xs font-mono', label: dateStr, isRisk: false };
+        };
+
+        function SearchableSelect({ label, options = [], value, onChange, disabled, placeholder="Select..." }) {
+            const [isOpen, setIsOpen] = useState(false); const [search, setSearch] = useState("");
+            const safeOptions = Array.isArray(options) ? options : [];
+            const selectedOption = safeOptions.find(o => o.id == value);
+            useEffect(() => { if (isOpen) setSearch(""); }, [isOpen]);
+            const filtered = safeOptions.filter(o => o.name.toLowerCase().includes(search.toLowerCase()));
+            return (<div className="relative">{label && <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">{label}</label>}<div className={`w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm flex justify-between items-center bg-white dark:bg-slate-800 transition-all ${disabled ? 'bg-slate-50 dark:bg-slate-900 text-slate-400 dark:text-slate-600' : 'cursor-pointer hover:border-brand-500 hover:ring-1 hover:ring-brand-500/20 dark:hover:border-brand-400 dark:hover:ring-brand-400/20'}`} onClick={()=>!disabled && setIsOpen(!isOpen)}><span className={`truncate ${!selectedOption?"text-slate-400 dark:text-slate-500":"text-slate-700 dark:text-slate-200"}`}>{selectedOption?selectedOption.name:placeholder}</span><i className="ph ph-caret-down text-slate-400"></i></div>{isOpen && (<><div className="fixed inset-0 z-20" onClick={()=>setIsOpen(false)}></div><div className="absolute z-30 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-60 overflow-hidden flex flex-col animate-fade-in"><div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-850"><input autoFocus type="text" className="w-full border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-brand-500 dark:bg-slate-700 dark:text-white" placeholder="Filter..." value={search} onChange={(e)=>setSearch(e.target.value)} /></div><div className="overflow-y-auto flex-1">{filtered.length===0?<div className="p-3 text-slate-400 text-xs text-center">No matches</div>:filtered.map(opt=>(<div key={opt.id} className={`px-3 py-2 text-sm cursor-pointer hover:bg-brand-50 dark:hover:bg-brand-900/30 dark:hover:text-brand-300 hover:text-brand-700 ${value==opt.id?'bg-brand-50 dark:bg-brand-900/30 font-medium text-brand-700 dark:text-brand-300':'dark:text-slate-300'}`} onClick={()=>{onChange(opt.id);setIsOpen(false)}}>{opt.name}</div>))}</div></div></>)}</div>);
+        }
+
+        function StatCard({ label, value, icon, color, onClick }) {
+            const bgClass = `bg-${color}-50 dark:bg-${color}-900/20`; const textClass = `text-${color}-600 dark:text-${color}-400`;
+            return (<div onClick={onClick} className={`bg-white dark:bg-slate-850 p-5 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-all duration-300 ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-md hover:border-' + color + '-200 dark:hover:border-' + color + '-900' : ''}`}><div className={`p-3.5 rounded-lg ${bgClass} ${textClass} text-xl shadow-sm`}><i className={`ph ${icon}`}></i></div><div><div className="text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-wider mb-0.5">{label}</div><div className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">{value}</div></div></div>);
+        }
+
+        // --- DASHBOARD ---
+        function DashboardView({ inventory, onNavigateToRisks }) {
+            const isDark = useDarkMode();
+            const stats = useMemo(() => {
+                let total=inventory.length, risks=0;
+                let statusCounts = { Active:0, 'In-Stock':0, Decommissioned:0 };
+                let brandCounts = {};
+                const uniqueLocations = new Set(inventory.map(i => i.location).filter(Boolean));
+                inventory.forEach(i => {
+                    const eos = getEOSMeta(i.eos_date);
+                    if (eos.isRisk && i.status !== 'Decommissioned') risks++;
+                    statusCounts[i.status] = (statusCounts[i.status] || 0) + 1;
+                    if(i.brand) brandCounts[i.brand] = (brandCounts[i.brand] || 0) + 1;
+                });
+                return { total, risks, statusCounts, brandCounts, locCount: uniqueLocations.size };
+            }, [inventory]);
+
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+            const gridColor = isDark ? '#334155' : '#e2e8f0';
+            const statusChart = { labels: Object.keys(stats.statusCounts), datasets: [{ data: Object.values(stats.statusCounts), backgroundColor: ['#10b981', '#3b82f6', '#94a3b8'], borderWidth: 0, hoverOffset: 4 }] };
+            const sortedBrands = Object.entries(stats.brandCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+            const brandChart = { labels: sortedBrands.map(b=>b[0]), datasets: [{ label: 'Devices', data: sortedBrands.map(b=>b[1]), backgroundColor: '#6366f1', borderRadius: 4, barThickness: 30 }] };
+            const chartOptions = { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true, grid:{display:false, color: gridColor}, ticks: {color: textColor}}, x:{grid:{display:false}, ticks: {color: textColor}} } };
+
+            return (
+                <div className="p-8 animate-fade-in">
+                    <div className="mb-8"><h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Dashboard</h2><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Operational insights and metrics.</p></div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"><StatCard label="Total Assets" value={stats.total} icon="ph-hard-drives" color="blue" /><StatCard label="Active" value={stats.statusCounts.Active} icon="ph-pulse" color="emerald" /><StatCard label="Locations" value={stats.locCount} icon="ph-map-pin" color="purple" /><StatCard label="Support Risks" value={stats.risks} icon="ph-warning" color="red" onClick={onNavigateToRisks} /></div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"><div className="bg-white dark:bg-slate-850 p-6 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm lg:col-span-2"><div className="flex justify-between items-start mb-6"><div><h3 className="font-bold text-slate-700 dark:text-slate-300">Manufacturer Distribution</h3><p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Top 5 brands by asset count in your inventory.</p></div><div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"><i className="ph ph-chart-bar text-slate-400"></i></div></div><div className="h-64 w-full"><SimpleChart type="bar" data={brandChart} options={chartOptions} /></div></div><div className="bg-white dark:bg-slate-850 p-6 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm"><div className="flex justify-between items-start mb-6"><div><h3 className="font-bold text-slate-700 dark:text-slate-300">Asset Status</h3><p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Breakdown of operational states.</p></div><div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"><i className="ph ph-chart-pie-slice text-slate-400"></i></div></div><div className="h-64 w-full flex justify-center"><div className="w-full h-full"><SimpleChart type="doughnut" data={statusChart} options={{responsive:true, maintainAspectRatio:false, cutout:'70%', plugins:{legend:{position:'bottom', labels:{usePointStyle:true, padding:20, font:{size:11, family:"'Plus Jakarta Sans'"}, color: textColor}}}}} /></div></div></div></div>
+                </div>
+            );
+        }
+
+        // --- INVENTORY VIEW ---
+        function InventoryView({ inventory, user, fetchData, onImportOpen, onEdit, onDelete, riskFilter, setRiskFilter }) {
+            const [searchTerm, setSearchTerm] = useState("");
+            const [locationFilter, setLocationFilter] = useState("");
+            const [sortConfig, setSortConfig] = useState({ key: 'hostname', direction: 'ascending' });
+            const processedInventory = useMemo(() => {
+                let items = [...inventory];
+                if (riskFilter) { items = items.filter(i => { const meta = getEOSMeta(i.eos_date); return meta.isRisk && i.status !== 'Decommissioned'; }); }
+                if (searchTerm) { const s = searchTerm.toLowerCase(); items = items.filter(i => (i.hostname.toLowerCase().includes(s) || (i.ip_address && i.ip_address.includes(s)) || (i.serial_number && i.serial_number.toLowerCase().includes(s)))); }
+                if (locationFilter) items = items.filter(i => i.location === locationFilter);
+                if (sortConfig.key) { items.sort((a, b) => { let valA = a[sortConfig.key] ? a[sortConfig.key].toString().toLowerCase() : ''; let valB = b[sortConfig.key] ? b[sortConfig.key].toString().toLowerCase() : ''; if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1; if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1; return 0; }); }
+                return items;
+            }, [inventory, searchTerm, locationFilter, sortConfig, riskFilter]);
+            const uniqueLocations = useMemo(() => [...new Set(inventory.map(i => i.location).filter(Boolean))].sort(), [inventory]);
+
+            return (
+                <div className="p-8 animate-fade-in h-screen flex flex-col box-border">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-6 shrink-0 gap-4">
+                        <div><h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Inventory List</h2><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Complete database of all tracked assets.</p></div>
+                        <div className="flex gap-2">
+                            <a href="api/export.php" target="_blank" className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 text-sm font-bold hover:border-brand-200 dark:hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 transition-all"><i className="ph ph-download-simple text-lg"></i> Export</a>
+                            {user.role !== 'viewer' && (<><button onClick={onImportOpen} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 text-sm font-bold hover:border-brand-200 dark:hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 transition-all"><i className="ph ph-upload-simple text-lg"></i> Import</button><button onClick={() => onEdit(null)} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-brand-200 dark:shadow-none flex items-center gap-2 text-sm font-bold hover:bg-brand-700 transition-all transform hover:-translate-y-0.5"><i className="ph ph-plus text-lg"></i> Add Device</button></>)}
+                        </div>
+                    </div>
+                    {riskFilter && (<div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 rounded-xl flex items-center justify-between animate-fade-in shrink-0"><div className="flex items-center gap-3"><div className="p-2 bg-red-100 dark:bg-red-800 rounded-lg text-red-600 dark:text-red-200"><i className="ph ph-warning-circle text-lg"></i></div><div><div className="text-red-800 dark:text-red-200 text-sm font-bold">Filtered by Support Risks</div><div className="text-red-600 dark:text-red-400 text-xs">Showing active devices expired or expiring within 1.5 years.</div></div></div><button onClick={() => setRiskFilter(false)} className="text-xs bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors font-bold shadow-sm">Clear Filter</button></div>)}
+                    <div className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+                        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex gap-4 bg-white dark:bg-slate-850 items-center shrink-0">
+                            <div className="relative flex-1 max-w-md"><i className="ph ph-magnifying-glass absolute left-3.5 top-2.5 text-slate-400 dark:text-slate-500 text-lg"></i><input type="text" placeholder="Search devices..." className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:bg-slate-900 dark:text-white transition-all" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} /></div>
+                            <div className="relative w-64"><i className="ph ph-map-pin absolute left-3 top-3 text-slate-400 dark:text-slate-500"></i><select className="w-full pl-9 pr-8 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm appearance-none bg-white dark:bg-slate-900 dark:text-white focus:outline-none focus:border-brand-500" value={locationFilter} onChange={e=>setLocationFilter(e.target.value)}><option value="">All Locations</option>{uniqueLocations.map(l=><option key={l} value={l}>{l}</option>)}</select><i className="ph ph-caret-down absolute right-3 top-3 text-slate-400 pointer-events-none"></i></div>
+                            <div className="flex-1"></div>
+                            <button onClick={fetchData} className="p-2.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-xl transition-all"><i className="ph ph-arrows-clockwise text-xl"></i></button>
+                        </div>
+                        <div className="flex-1 overflow-auto table-container bg-white dark:bg-slate-850">
+                            <table className="w-full text-left border-collapse"><thead className="sticky-header text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/50"><tr>{[{k:'hostname',l:'Hostname'},{k:'ip_address',l:'IP Address'},{k:'brand',l:'Brand'},{k:'model',l:'Model'},{k:'firmware_version',l:'Firmware'},{k:'location',l:'Location'},{k:'status',l:'Status'}].map(h=>(<th key={h.k} onClick={()=>setSortConfig({key:h.k, direction:sortConfig.key===h.k&&sortConfig.direction==='ascending'?'descending':'ascending'})} className="px-6 py-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors select-none">{h.l} {sortConfig.key===h.k && <i className={`ph ${sortConfig.direction==='ascending'?'ph-caret-up':'ph-caret-down'} ml-1 align-middle`}></i>}</th>))}{user.role!=='viewer' && <th className="px-6 py-4 text-right">Actions</th>}</tr></thead>
+                                <tbody className="text-sm text-slate-600 dark:text-slate-400 divide-y divide-slate-100 dark:divide-slate-800">{processedInventory.map(item => { const eos = getEOSMeta(item.eos_date); return (<tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group"><td className="px-6 py-3.5"><div className="font-bold text-slate-800 dark:text-slate-200">{item.hostname}</div><div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">{item.serial_number || '-'}</div></td><td className="px-6 py-3.5 font-mono text-slate-500 dark:text-slate-400 text-xs bg-slate-50/50 dark:bg-slate-800/50 rounded-lg">{item.ip_address}</td><td className="px-6 py-3.5">{item.brand}</td><td className="px-6 py-3.5"><div>{item.model}</div>{item.eos_date && <div className={`inline-block mt-1 ${eos.class}`}>{eos.label}</div>}</td><td className="px-6 py-3.5 text-sm text-slate-500 dark:text-slate-400">{item.firmware_version || '-'}</td><td className="px-6 py-3.5"><div>{item.location}</div>{item.sub_location && <div className="text-xs text-slate-400 dark:text-slate-500">{item.sub_location}</div>}</td><td className="px-6 py-3.5"><span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${item.status==='Active'?'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-900/50':item.status==='Decommissioned'?'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700':'bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-900/50'}`}><span className={`w-1.5 h-1.5 rounded-full ${item.status==='Active'?'bg-emerald-500':item.status==='Decommissioned'?'bg-slate-400':'bg-blue-500'}`}></span>{item.status}</span></td>{user.role!=='viewer' && (<td className="px-6 py-3.5 text-right"><div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => onEdit(item)} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-all"><i className="ph ph-pencil-simple text-lg"></i></button><button onClick={() => onDelete(item.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"><i className="ph ph-trash text-lg"></i></button></div></td>)}</tr>); })}</tbody>
+                            </table>
+                        </div>
+                        <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-xs text-slate-400 dark:text-slate-500 text-right font-medium shrink-0">Showing {processedInventory.length} assets</div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- SETTINGS VIEW ---
+        function SettingsView({ options, onDataUpdated, currentUser }) {
+            const [activeTab, setActiveTab] = useState('master');
+            const toast = useToast();
+            
+            // Master Data States
+            const [brandName, setBrandName] = useState(""); const [editingBrand, setEditingBrand] = useState(null);
+            const [modelForm, setModelForm] = useState({ brand_id: "", name: "", eos_date: "" }); const [editingModel, setEditingModel] = useState(null);
+            const [brandSearch, setBrandSearch] = useState(""); const [modelSearch, setModelSearch] = useState(""); 
+            
+            // User & Backup States
+            const [users, setUsers] = useState([]); const [userForm, setUserForm] = useState({ username: "", password: "", role: "editor" }); const [editingUser, setEditingUser] = useState(null);
+            const [backupPass, setBackupPass] = useState(""); const [restoreFile, setRestoreFile] = useState(null); const [restorePass, setRestorePass] = useState("");
+
+            // Gateway Config (Replaces SMTP)
+            const [gatewayConfig, setGatewayConfig] = useState({ alert_email: "", gateway_url: "", gateway_key: "" });
+
+            useEffect(() => { 
+                if (activeTab === 'users' && currentUser.role === 'admin') axios.get('api/users.php').then(res => setUsers(res.data)); 
+                if (activeTab === 'notifications') {
+                    axios.get('api/settings.php').then(res => {
+                        const g = res.data.gateway;
+                        setGatewayConfig({
+                            alert_email: res.data.alert_email, 
+                            gateway_url: g.url,
+                            gateway_key: g.key
+                        });
+                    });
+                }
+            }, [activeTab]);
+
+            const api = (url, data, txt) => { axios.post(url, data).then(res => { if (res.data.success) { toast(txt, 'success'); onDataUpdated(); if(activeTab==='users') { axios.get('api/users.php').then(r=>setUsers(r.data)); setEditingUser(null); setUserForm({username:"",password:"",role:"editor"}); } if(activeTab==='master') { setBrandName(""); setEditingBrand(null); setModelForm({brand_id:"", name:"", eos_date:""}); setEditingModel(null); } } else toast(res.data.message, 'error'); }).catch(e => toast(e.response?.data?.message || e.message, 'error')); };
+            const brands = options?.brands || []; const models = options?.models || [];
+            
+            const handleSaveBrand = (e) => { e.preventDefault(); editingBrand ? api('api/settings.php', {action:'edit_brand', id:editingBrand.id, name:brandName}, "Brand Updated") : api('api/settings.php', {action:'add_brand', name:brandName}, "Brand Added"); };
+            const handleSaveModel = (e) => { e.preventDefault(); editingModel ? api('api/settings.php', {action:'edit_model', id:editingModel.id, ...modelForm}, "Model Updated") : api('api/settings.php', {action:'add_model', ...modelForm}, "Model Added"); };
+            const saveUser = (e) => { e.preventDefault(); if (editingUser) axios.put('api/users.php', { id: editingUser.id, ...userForm }).then(res => { if(res.data.success) { toast("User Updated", 'success'); axios.get('api/users.php').then(r=>setUsers(r.data)); setEditingUser(null); setUserForm({username:"", password:"", role:"editor"}); } else toast(res.data.message, 'error'); }).catch(err => toast(err.response?.data?.message, 'error')); else api('api/users.php', userForm, "User Added"); };
+            const handleBackup = (e) => { e.preventDefault(); axios.post('api/backup.php', { password: backupPass }).then(res => { if(res.data.success) { const link = document.createElement('a'); link.href = 'data:application/octet-stream;base64,' + res.data.content; link.download = res.data.filename; link.click(); toast("Backup Downloaded",'success'); } }).catch(err => toast("Backup Failed", 'error')); };
+            const handleRestore = (e) => { e.preventDefault(); if(!restoreFile || !restorePass) return alert("Required fields missing"); if(!confirm("WARNING: Database will be wiped. Continue?")) return; const formData = new FormData(); formData.append('backup_file', restoreFile); formData.append('password', restorePass); axios.post('api/restore.php', formData, { headers: {'Content-Type': 'multipart/form-data'} }).then(res => { if(res.data.success) { alert("Restored! Reloading..."); window.location.reload(); } else toast(res.data.message,'error')}).catch(err => toast(err.response?.data?.message || err.message, 'error')); };
+            
+            const handleSaveGateway = (e) => { e.preventDefault(); axios.post('api/settings.php', { action: 'save_gateway_config', data: gatewayConfig }).then(res => { if(res.data.success) toast("Connection Saved", 'success'); else toast("Failed", 'error'); }).catch(e => toast("Error saving", 'error')); };
+            const handleTestEmail = () => { const btn = document.getElementById('testBtn'); const orig = btn.innerText; btn.innerText = "Sending..."; btn.disabled=true; axios.get('api/cron_eos_report.php').then(res => { if(res.data.status==='success') toast("Gateway Test Success!", 'success'); else toast(res.data.message, 'warning'); }).catch(e => toast("Send Failed: " + (e.response?.data?.message || e.message), 'error')).finally(() => { btn.innerText = orig; btn.disabled=false; }); };
+
+            return (
+                <div className="p-8 max-w-6xl mx-auto animate-fade-in">
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">Settings</h2>
+                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-8 w-fit flex-wrap">
+                        {['master', 'users', 'notifications', 'backup'].map(tab => (
+                            <button key={tab} onClick={()=>setActiveTab(tab)} className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab===tab ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                            </button>
+                        ))}
+                    </div>
+
+                    {activeTab === 'master' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div className="bg-white dark:bg-slate-850 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col h-[600px]">
+                                <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-700 dark:text-slate-200">Brands</h3><input type="text" placeholder="Search..." className="text-xs border dark:border-slate-600 rounded-lg px-2 py-1 bg-white dark:bg-slate-700 dark:text-white focus:outline-none" value={brandSearch} onChange={e=>setBrandSearch(e.target.value)} /></div>
+                                <div className="flex-1 overflow-y-auto mb-4 pr-2 space-y-2">{brands.filter(b=>b.name.toLowerCase().includes(brandSearch.toLowerCase())).map(b => (<div key={b.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 text-sm group hover:border-brand-200 dark:hover:border-brand-800 transition-colors"><span className="font-medium text-slate-700 dark:text-slate-300">{b.name}</span><div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={()=>{setEditingBrand(b); setBrandName(b.name);}} className="text-brand-600 dark:text-brand-400"><i className="ph ph-pencil-simple"></i></button><button onClick={()=>{if(confirm("Delete?")) api('api/settings.php', {action:'delete_brand', id:b.id}, "Deleted")}} className="text-red-500 dark:text-red-400"><i className="ph ph-trash"></i></button></div></div>))}</div>
+                                <form onSubmit={handleSaveBrand} className="border-t border-slate-100 dark:border-slate-800 pt-4"><h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{editingBrand ? 'Edit Brand' : 'New Brand'}</h4><div className="flex gap-2"><input required value={brandName} onChange={e=>setBrandName(e.target.value)} className="flex-1 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-900 dark:text-white" placeholder="Brand Name" /><button className="bg-slate-900 dark:bg-slate-700 text-white px-4 rounded-lg text-sm font-medium hover:bg-slate-800 dark:hover:bg-slate-600">{editingBrand ? 'Update' : 'Add'}</button></div>{editingBrand && <button type="button" onClick={()=>{setEditingBrand(null); setBrandName("");}} className="text-xs text-red-500 mt-2">Cancel</button>}</form>
+                            </div>
+                            <div className="bg-white dark:bg-slate-850 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col h-[600px]">
+                                <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-700 dark:text-slate-200">Models</h3><input type="text" placeholder="Search..." className="text-xs border dark:border-slate-600 rounded-lg px-2 py-1 bg-white dark:bg-slate-700 dark:text-white focus:outline-none" value={modelSearch} onChange={e=>setModelSearch(e.target.value)} /></div>
+                                <div className="flex-1 overflow-y-auto mb-4 pr-2 space-y-2">{models.filter(m=>m.name.toLowerCase().includes(modelSearch.toLowerCase())).map(m => (<div key={m.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 text-sm group hover:border-brand-200 dark:hover:border-brand-800 transition-colors"><div><span className="font-medium text-slate-700 dark:text-slate-300">{m.name}</span> <span className="text-slate-400 dark:text-slate-500 text-xs ml-2">{brands.find(b=>b.id===m.brand_id)?.name}</span></div><div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={()=>{setEditingModel(m); setModelForm({brand_id:m.brand_id, name:m.name, eos_date:m.eos_date});}} className="text-brand-600 dark:text-brand-400"><i className="ph ph-pencil-simple"></i></button><button onClick={()=>{if(confirm("Delete?")) api('api/settings.php', {action:'delete_model', id:m.id}, "Deleted")}} className="text-red-500 dark:text-red-400"><i className="ph ph-trash"></i></button></div></div>))}</div>
+                                <form onSubmit={handleSaveModel} className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-4"><div className="flex justify-between"><h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{editingModel ? 'Edit Model' : 'New Model'}</h4>{editingModel && <button type="button" onClick={()=>{setEditingModel(null); setModelForm({brand_id:"", name:"", eos_date:""});}} className="text-xs text-red-500">Cancel</button>}</div><SearchableSelect label="Brand" options={brands} value={modelForm.brand_id} onChange={v=>setModelForm({...modelForm, brand_id:v})} placeholder="Select Brand" /><div><label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Model Name</label><input required value={modelForm.name} onChange={e=>setModelForm({...modelForm, name:e.target.value})} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-900 dark:text-white" /></div><div><label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">EOS Date</label><input type="date" value={modelForm.eos_date} onChange={e=>setModelForm({...modelForm, eos_date:e.target.value})} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none text-slate-600 dark:text-white dark:bg-slate-900" /></div><button className="w-full bg-brand-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-brand-700 shadow-sm shadow-brand-200 dark:shadow-none">{editingModel ? 'Update Model' : 'Add Model'}</button></form>
+                            </div>
+                        </div>
+                    )}
+                    {activeTab === 'users' && currentUser.role === 'admin' && (<div className="bg-white dark:bg-slate-850 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800"><div className="mb-6 space-y-2">{users.map(u=><div key={u.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-lg text-sm"><span><span className="font-bold text-slate-700 dark:text-slate-200">{u.username}</span> <span className="text-xs bg-white dark:bg-slate-700 border dark:border-slate-600 px-2 py-0.5 rounded ml-2 text-slate-500 dark:text-slate-400 uppercase">{u.role}</span></span><div><button onClick={()=>{setEditingUser(u);setUserForm({username:u.username, role:u.role, password:""})}} className="text-brand-600 dark:text-brand-400 mr-4 font-medium">Edit</button>{u.id!==currentUser.id && <button onClick={()=>{if(confirm("Delete?")) axios.delete('api/users.php',{data:{id:u.id}}).then(()=>{toast("Deleted",'success');axios.get('api/users.php').then(r=>setUsers(r.data))})}} className="text-red-500 font-medium">Delete</button>}</div></div>)}</div><form onSubmit={saveUser} className="grid grid-cols-4 gap-4 items-end bg-slate-50 dark:bg-slate-900 p-4 rounded-xl"><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Username</label><input value={userForm.username} onChange={e=>setUserForm({...userForm,username:e.target.value})} className="w-full border dark:border-slate-700 rounded-lg p-2 text-sm dark:bg-slate-800 dark:text-white" required/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Password</label><input type="password" value={userForm.password} onChange={e=>setUserForm({...userForm,password:e.target.value})} className="w-full border dark:border-slate-700 rounded-lg p-2 text-sm dark:bg-slate-800 dark:text-white" placeholder={editingUser?"(Unchanged)":""} required={!editingUser}/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Role</label><select value={userForm.role} onChange={e=>setUserForm({...userForm,role:e.target.value})} className="w-full border dark:border-slate-700 rounded-lg p-2 text-sm dark:bg-slate-800 dark:text-white"><option value="editor">Editor</option><option value="admin">Admin</option><option value="viewer">Viewer</option></select></div><div className="flex gap-2"><button className="bg-brand-600 text-white font-bold py-2 px-4 rounded-lg flex-1">{editingUser?'Update':'Create'}</button>{editingUser && <button type="button" onClick={()=>{setEditingUser(null);setUserForm({username:"",password:"",role:"editor"})}} className="bg-white dark:bg-slate-700 border dark:border-slate-600 text-slate-500 dark:text-slate-300 py-2 px-4 rounded-lg">Cancel</button>}</div></form></div>)}
+                    {activeTab === 'backup' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div className="bg-white dark:bg-slate-850 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center"><h3 className="font-bold text-slate-800 dark:text-white">Export Backup</h3><form onSubmit={(e)=>{e.preventDefault(); axios.post('api/backup.php',{password:backupPass}).then(res=>{if(res.data.success){const a=document.createElement('a');a.href='data:application/octet-stream;base64,'+res.data.content;a.download=res.data.filename;a.click();toast("Backup Downloaded",'success')}else toast(res.data.message,'error')})}}><input type="password" placeholder="Encryption Password" value={backupPass} onChange={e=>setBackupPass(e.target.value)} className="w-full border dark:border-slate-700 rounded-lg p-3 my-4 text-center text-sm dark:bg-slate-900 dark:text-white" required/><button className="w-full bg-slate-800 dark:bg-slate-700 text-white font-bold py-3 rounded-lg hover:bg-slate-900">Download .dat</button></form></div><div className="bg-red-50 dark:bg-red-900/10 p-8 rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 text-center"><h3 className="font-bold text-red-900 dark:text-red-300">Restore Database</h3><form onSubmit={(e)=>{e.preventDefault(); if(!confirm("WIPE DB?"))return; const fd=new FormData(); fd.append('backup_file',restoreFile); fd.append('password',restorePass); axios.post('api/restore.php',fd).then(res=>{if(res.data.success){alert("Restored");window.location.reload()}else toast(res.data.message,'error')})}}><input type="file" onChange={e=>setRestoreFile(e.target.files[0])} className="w-full mb-4 text-xs bg-white dark:bg-slate-800 dark:text-slate-300 p-2 rounded border border-red-200 dark:border-red-900/50" required/><input type="password" placeholder="Backup Password" value={restorePass} onChange={e=>setRestorePass(e.target.value)} className="w-full border border-red-200 dark:border-red-900/50 rounded-lg p-3 mb-4 text-center text-sm dark:bg-slate-900 dark:text-white" required/><button className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700">Restore Data</button></form></div></div>)}
+
+                    {/* NEW: NOTIFICATIONS TAB (Gateway Client Config) */}
+                    {activeTab === 'notifications' && (
+                        <div className="max-w-2xl mx-auto">
+                            <div className="bg-white dark:bg-slate-850 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+                                <div className="text-center mb-8">
+                                    <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl"><i className="ph ph-bell-ringing"></i></div>
+                                    <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Notification Gateway</h3>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                                        Configure the connection to your <strong>InfraGateway</strong> service.
+                                    </p>
+                                </div>
+                                
+                                <form onSubmit={handleSaveGateway} className="space-y-4 text-left">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Alert Recipient Email</label>
+                                        <input type="email" required className="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900 dark:text-white" value={gatewayConfig.alert_email} onChange={e=>setGatewayConfig({...gatewayConfig, alert_email:e.target.value})} placeholder="admin@company.com" />
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                        <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">Gateway Connection</h4>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Gateway Endpoint URL</label>
+                                                <input required className="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm font-mono dark:bg-slate-900 dark:text-white" value={gatewayConfig.gateway_url} onChange={e=>setGatewayConfig({...gatewayConfig, gateway_url:e.target.value})} placeholder="http://localhost/infra-gateway/api/send.php" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Gateway API Key</label>
+                                                <input required className="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm font-mono dark:bg-slate-900 dark:text-white" value={gatewayConfig.gateway_key} onChange={e=>setGatewayConfig({...gatewayConfig, gateway_key:e.target.value})} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3 pt-4">
+                                        <button type="submit" className="flex-1 bg-slate-900 dark:bg-brand-600 text-white font-bold py-2.5 rounded-lg hover:bg-slate-800 dark:hover:bg-brand-700 transition-all">Save Connection</button>
+                                        <button type="button" id="testBtn" onClick={handleTestEmail} className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
+                                            Test Connection
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // --- GLOBAL & APP RENDER ---
+        function LogsView() {
+            const [logs, setLogs] = useState([]);
+            useEffect(() => { axios.get('api/logs.php').then(res => setLogs(Array.isArray(res.data) ? res.data : [])); }, []);
+            return (<div className="p-8 max-w-6xl mx-auto animate-fade-in"><h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">Audit Logs</h2><div className="bg-white dark:bg-slate-850 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"><table className="w-full text-sm text-left"><thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold"><tr><th className="p-4">Time</th><th className="p-4">User</th><th className="p-4">Action</th><th className="p-4">Details</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{logs.map(l=><tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800"><td className="p-4 text-slate-400 dark:text-slate-500 text-xs font-mono">{l.created_at}</td><td className="p-4 font-bold text-slate-700 dark:text-slate-300">{l.username}</td><td className="p-4"><span className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-xs font-bold text-slate-600 dark:text-slate-300">{l.action}</span></td><td className="p-4 text-slate-600 dark:text-slate-400">{l.target} - <span className="text-slate-400 dark:text-slate-500">{l.details}</span></td></tr>)}</tbody></table></div></div>);
+        }
+
+        function Layout({ user, currentView, onViewChange, onLogout, children }) {
+            const menuItems = [ { id: 'dashboard', label: 'Dashboard', icon: 'ph-chart-pie-slice' }, { id: 'inventory', label: 'Inventory', icon: 'ph-rows' }, { id: 'logs', label: 'Activity Logs', icon: 'ph-clipboard-text' }, ...(user.role !== 'viewer' ? [{ id: 'settings', label: 'Settings', icon: 'ph-gear' }] : []) ];
+            return (
+                <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+                    <aside className="w-64 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 z-20">
+                        <div className="p-6 flex items-center gap-3"><div className="bg-brand-600 text-white p-2 rounded-lg shadow-lg shadow-brand-200 dark:shadow-none"><i className="ph ph-hard-drives text-xl"></i></div><span className="font-bold text-lg tracking-tight text-slate-800 dark:text-white">InfraInv</span></div>
+                        <nav className="flex-1 px-4 space-y-1.5 py-6">{menuItems.map(i=><button key={i.id} onClick={()=>onViewChange(i.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${currentView===i.id?'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 shadow-sm ring-1 ring-brand-100 dark:ring-0':'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white'}`}><i className={`ph ${i.icon} text-lg`}></i>{i.label}</button>)}</nav>
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-800"><div className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 mb-2"><div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900 text-brand-600 dark:text-brand-300 flex items-center justify-center font-bold text-xs">{user.username.substr(0,2).toUpperCase()}</div><div className="overflow-hidden"><div className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{user.username}</div><div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">{user.role}</div></div></div><button onClick={onLogout} className="w-full text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 rounded-lg font-medium transition-colors">Sign Out</button></div>
+                    </aside>
+                    <main className="flex-1 overflow-auto relative">{children}</main>
+                </div>
+            );
+        }
+
+        // --- GLOBAL MODALS ---
+        function DeviceModal({ isOpen, onClose, onSave, options, initialData }) {
+            const [form, setForm] = useState(initialData || { hostname:'', ip_address:'', serial_number:'', asset_id:'', firmware_version:'', location:'', sub_location:'', status:'Active', type_id:'', brand_id:'', model_id:'', notes:'' });
+            useEffect(() => { setForm(initialData || { hostname:'', ip_address:'', serial_number:'', asset_id:'', firmware_version:'', location:'', sub_location:'', status:'Active', type_id:'', brand_id:'', model_id:'', notes:'' }); }, [initialData]);
+            const brands = options?.brands || []; const models = options?.models || []; const filteredModels = models.filter(m => m.brand_id == form.brand_id);
+            const handleChange = (e) => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+            const handleSelectChange = (name, value) => { setForm(prev => { if (name === 'brand_id') return { ...prev, [name]: value, model_id: '' }; return { ...prev, [name]: value }; }); };
+            
+            return (<div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"><div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800"><h2 className="text-xl font-bold text-slate-800 dark:text-white">{initialData ? 'Edit Device' : 'Add New Device'}</h2><button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl">✕</button></div><form onSubmit={(e) => { e.preventDefault(); onSave(form); }} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6"><div className="col-span-1 md:col-span-2 bg-brand-50 dark:bg-brand-900/20 p-4 rounded-xl border border-brand-100 dark:border-brand-900/50"><h3 className="text-xs font-bold text-brand-700 dark:text-brand-300 uppercase tracking-wider mb-3">Core Identity</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Hostname</label><input required name="hostname" value={form.hostname} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Serial Number</label><input required name="serial_number" value={form.serial_number} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div></div></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Type</label><select required name="type_id" value={form.type_id} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800 dark:text-white"><option value="">Select Type</option>{(options.types||[]).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Status</label><select name="status" value={form.status} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800 dark:text-white"><option value="Active">Active</option><option value="In-Stock">In-Stock</option><option value="Decommissioned">Decommissioned</option></select></div><div><SearchableSelect label="Brand" options={brands} value={form.brand_id} onChange={(val)=>handleSelectChange('brand_id', val)} placeholder="Select Brand..."/></div><div><SearchableSelect label="Model" options={filteredModels} value={form.model_id} onChange={(val)=>handleSelectChange('model_id', val)} disabled={!form.brand_id} placeholder="Select Model..."/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Mgmt IP</label><input name="ip_address" value={form.ip_address||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Asset Tag</label><input name="asset_id" value={form.asset_id||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Location (Site)</label><input name="location" value={form.location||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Sub Location</label><input name="sub_location" value={form.sub_location||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Firmware</label><input name="firmware_version" value={form.firmware_version||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div className="col-span-1 md:col-span-2"><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Notes</label><textarea name="notes" value={form.notes||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" rows="2"></textarea></div><div className="col-span-1 md:col-span-2 flex justify-end gap-3 mt-4 border-t border-slate-100 dark:border-slate-800 pt-6"><button type="button" onClick={onClose} className="px-6 py-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors">Cancel</button><button type="submit" className="px-6 py-2.5 bg-brand-600 text-white rounded-lg font-bold hover:bg-brand-700 shadow-lg shadow-brand-200 dark:shadow-none transition-all transform hover:-translate-y-0.5">Save Device</button></div></form></div></div>);
+        }
+
+        function ImportModal({ onClose, onDataUpdated }) {
+            const toast = useToast();
+            const [file, setFile] = useState(null); const [result, setResult] = useState(null); const [uploading, setUploading] = useState(false);
+            const downloadTemplate = () => { const h=["Hostname","IP","Serial","Type","Brand","Model","Location","SubLocation","Status"]; const s=["SW1","1.1.1.1","SN123","Switch","Cisco","C9300","Datacenter","Rack1","Active"]; const csv="data:text/csv;charset=utf-8,"+h.join(",")+"\n"+s.join(","); const a=document.createElement("a");a.href=encodeURI(csv);a.download="template.csv";a.click(); };
+            const handleUpload = (e) => { e.preventDefault(); if(!file) return toast("Select a file", "error"); setUploading(true); const fd=new FormData(); fd.append('file',file); axios.post('api/import.php',fd,{headers:{'Content-Type':'multipart/form-data'}}).then(res=>{setResult(res.data);setUploading(false);if(res.data.success){toast("Import Successful","success");onDataUpdated();}}).catch(e=>{toast("Import Failed","error");setUploading(false)}) };
+            return (<div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"><div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md p-6"><div className="flex justify-between mb-6"><h2 className="font-bold text-lg text-slate-800 dark:text-white">Import CSV</h2><button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button></div><div className="mb-6 text-sm bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 p-4 rounded-xl border border-blue-100 dark:border-blue-800 flex items-center justify-between"><span>Get the correct CSV format</span><button onClick={downloadTemplate} className="text-xs bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-700 px-3 py-1.5 rounded-lg font-bold hover:shadow-sm dark:text-blue-200">Download</button></div>{!result ? <form onSubmit={handleUpload} className="space-y-4"><input type="file" onChange={e=>setFile(e.target.files[0])} className="w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-50 dark:file:bg-brand-900/30 file:text-brand-700 dark:file:text-brand-300 hover:file:bg-brand-100" /><button disabled={uploading} className="w-full bg-slate-900 dark:bg-slate-700 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-all">{uploading?"Uploading...":"Start Import"}</button></form> : <div><div className={`p-4 rounded-xl mb-4 text-sm font-medium ${result.success?'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300':'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>{result.message}</div><button onClick={()=>{onClose();setResult(null)}} className="w-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-3 rounded-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-700">Close</button></div>}</div></div>);
+        }
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('dashboard');
+            const [inventory, setInventory] = useState([]);
+            const [options, setOptions] = useState({ brands: [], types: [], models: [] });
+            const [loading, setLoading] = useState(true);
+            const [searchTerm, setSearchTerm] = useState("");
+            const [locationFilter, setLocationFilter] = useState("");
+            const [sortConfig, setSortConfig] = useState({ key: 'hostname', direction: 'ascending' });
+            
+            const [isImportOpen, setIsImportOpen] = useState(false);
+            const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
+            const [editingDevice, setEditingDevice] = useState(null);
+            const [riskFilter, setRiskFilter] = useState(false);
+
+            useEffect(() => { if (user) fetchData(); }, [user]);
+
+            const fetchData = () => {
+                setLoading(true);
+                Promise.all([axios.get('api/inventory.php'), axios.get('api/options.php')])
+                .then(([invRes, optRes]) => { setInventory(Array.isArray(invRes.data) ? invRes.data : []); setOptions(optRes.data || { brands: [], types: [], models: [] }); setLoading(false); })
+                .catch(err => { console.error(err); setLoading(false); });
+            };
+
+            const handleLogout = () => { axios.get('api/logout.php').then(() => setUser(null)); };
+            
+            const handleSaveDevice = (formData) => {
+                if (!formData.brand_id || !formData.model_id) return alert("Please select Brand and Model.");
+                const method = editingDevice ? 'put' : 'post';
+                const payload = editingDevice ? { ...formData, id: editingDevice.id } : formData;
+                axios({ method, url: 'api/inventory.php', data: payload }).then(res => { if (res.data.error || res.data.message?.includes('Error')) alert(res.data.message || "Error"); else { setIsDeviceModalOpen(false); setEditingDevice(null); fetchData(); } }).catch(err => alert("Failed: " + err));
+            };
+            const handleDelete = (id) => { if(confirm("Delete?")) axios.delete('api/inventory.php', {data:{id}}).then(fetchData); };
+
+            const handleViewChange = (v) => {
+                setView(v);
+                if(v === 'inventory') setRiskFilter(false); 
+            };
+
+            const dataProps = { inventory, user, options, fetchData, onEdit: (item)=>{setEditingDevice(item);setIsDeviceModalOpen(true)}, onDelete: handleDelete, onImportOpen: ()=>setIsImportOpen(true), riskFilter, setRiskFilter };
+
+            if (!user) {
+                return (
+                    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+                        <div className="bg-white dark:bg-slate-900 p-10 rounded-3xl shadow-2xl w-full max-w-sm border border-slate-100 dark:border-slate-800">
+                            <div className="mb-8 text-center">
+                                <div className="w-14 h-14 bg-brand-600 rounded-2xl mx-auto flex items-center justify-center text-white text-2xl shadow-lg shadow-brand-200 dark:shadow-none mb-4"><i className="ph ph-hard-drives"></i></div>
+                                <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-1">Welcome Back</h2>
+                                <p className="text-slate-400 dark:text-slate-500 text-sm">Sign in to InfraInventory</p>
+                            </div>
+                            <form onSubmit={(e) => { e.preventDefault(); const u=e.target.username.value; const p=e.target.password.value; axios.post('api/login.php', {username:u, password:p}).then(res=>{if(res.data.success && res.data.user) setUser(res.data.user)}).catch(()=>alert("Login Failed")); }} className="space-y-4">
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Username</label><input name="username" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:bg-white dark:focus:bg-slate-900 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition-all dark:text-white" placeholder="Enter username" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Password</label><input name="password" type="password" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:bg-white dark:focus:bg-slate-900 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition-all dark:text-white" placeholder="••••••••" /></div>
+                                <button className="w-full bg-slate-900 dark:bg-brand-600 text-white font-bold py-3.5 rounded-xl hover:bg-slate-800 dark:hover:bg-brand-700 transition-all transform active:scale-95 shadow-lg shadow-slate-200 dark:shadow-none">Sign In</button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <ToastProvider>
+                    <Layout user={user} currentView={view} onViewChange={handleViewChange} onLogout={()=>setUser(null)}>
+                        {view === 'dashboard' && <DashboardView inventory={inventory} onNavigateToRisks={()=>{ setRiskFilter(true); setView('inventory'); }} />}
+                        {view === 'inventory' && <InventoryView {...dataProps} />}
+                        {view === 'settings' && <SettingsView options={options} onDataUpdated={fetchData} currentUser={user} />}
+                        {view === 'logs' && <LogsView />}
+
+                        {isDeviceModalOpen && <DeviceModal isOpen={true} onClose={()=>setIsDeviceModalOpen(false)} onSave={(fd)=>{const toast=window.tempToast; if(!fd.brand_id||!fd.model_id)return alert("Missing Brand/Model"); const m=editingDevice?'put':'post'; const p=editingDevice?{...fd, id:editingDevice.id}:fd; axios({method:m, url:'api/inventory.php', data:p}).then(res=>{if(res.data.success||res.data.message.includes('success')){setIsDeviceModalOpen(false);setEditingDevice(null);fetchData()}else alert(res.data.message)}).catch(e=>alert("Error"))}} options={options} initialData={editingDevice} />}
+                        {isImportOpen && <ImportModal onClose={()=>setIsImportOpen(false)} onDataUpdated={fetchData} />}
+                    </Layout>
+                </ToastProvider>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<App />);
+    </script>
+</body>
+</html>
