@@ -36,8 +36,8 @@ try {
         }
         if (empty($data[0]) && empty($data[2])) continue;
 
-        // V3.3 CSV Structure: 
-        // 0:Host, 1:IP, 2:Serial, 3:Type, 4:Brand, 5:Model, 6:Location, 7:SubLocation, 8:Status
+        // V6.0 CSV Structure: 
+        // 0:Host, 1:IP, 2:Serial, 3:Type, 4:Brand, 5:Model, 6:Location, 7:Rack, 8:RackPosition, 9:Status
         
         $hostname = $data[0] ?? null;
         $serial   = $data[2] ?? null;
@@ -48,12 +48,13 @@ try {
         $modelId = getId($pdo, 'models', 'name', !empty($data[5]) ? $data[5] : 'Generic Model', ['brand_id' => $brandId]);
 
         try {
-            $stmt = $pdo->prepare("INSERT INTO inventory (hostname, ip_address, serial_number, type_id, brand_id, model_id, location, sub_location, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $pdo->prepare("INSERT INTO inventory (hostname, ip_address, serial_number, type_id, brand_id, model_id, location, rack, rack_position, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $hostname, $data[1] ?? null, $serial, $typeId, $brandId, $modelId, 
-                $data[6] ?? null, 
-                $data[7] ?? null, // Sub Location
-                $data[8] ?? 'Active'
+                $data[6] ?? null, // Location
+                $data[7] ?? null, // Rack
+                $data[8] ?? null, // Rack Position
+                $data[9] ?? 'Active'
             ]);
             $success++;
         } catch (PDOException $e) { $errors[] = $e->getCode() == 23000 ? "Row $rowNum: Duplicate Serial." : "Row $rowNum Error: " . $e->getMessage(); }

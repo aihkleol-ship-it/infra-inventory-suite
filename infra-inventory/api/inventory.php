@@ -14,7 +14,7 @@ if ($method === 'GET') {
     // Added sub_location to SELECT
     $sql = "SELECT 
                 i.id, i.hostname, i.ip_address, i.serial_number, 
-                i.asset_id, i.firmware_version, i.location, i.sub_location, i.status, i.notes,
+                i.asset_id, i.firmware_version, i.location, i.sub_location, i.rack, i.rack_position, i.status, i.notes,
                 i.type_id, i.brand_id, i.model_id, 
                 dt.name as type, b.name as brand, m.name as model, m.eos_date
             FROM inventory i
@@ -32,8 +32,8 @@ elseif ($method === 'POST') {
     if (!isset($input['hostname'], $input['serial_number'])) { http_response_code(400); echo json_encode(["message" => "Missing data"]); exit; }
 
     $sql = "INSERT INTO inventory 
-            (hostname, ip_address, serial_number, asset_id, firmware_version, location, sub_location, status, type_id, brand_id, model_id, notes)
-            VALUES (:hostname, :ip, :serial, :asset, :fw, :loc, :sub, :status, :type, :brand, :model, :notes)";
+            (hostname, ip_address, serial_number, asset_id, firmware_version, location, sub_location, rack, rack_position, status, type_id, brand_id, model_id, notes)
+            VALUES (:hostname, :ip, :serial, :asset, :fw, :loc, :sub, :rack, :rack_pos, :status, :type, :brand, :model, :notes)";
 
     try {
         $stmt = $pdo->prepare($sql);
@@ -41,6 +41,7 @@ elseif ($method === 'POST') {
             ':hostname' => $input['hostname'], ':ip' => $input['ip_address'] ?? null, ':serial' => $input['serial_number'],
             ':asset' => $input['asset_id'] ?? null, ':fw' => $input['firmware_version'] ?? null, 
             ':loc' => $input['location'] ?? null, ':sub' => $input['sub_location'] ?? null,
+            ':rack' => $input['rack'] ?? null, ':rack_pos' => $input['rack_position'] ?? null,
             ':status' => $input['status'] ?? 'Active', ':type' => $input['type_id'], ':brand' => $input['brand_id'],
             ':model' => $input['model_id'], ':notes' => $input['notes'] ?? null
         ]);
@@ -54,7 +55,7 @@ elseif ($method === 'PUT') {
 
     $sql = "UPDATE inventory SET 
             hostname = :hostname, ip_address = :ip, serial_number = :serial, asset_id = :asset, 
-            firmware_version = :fw, location = :loc, sub_location = :sub, status = :status, 
+            firmware_version = :fw, location = :loc, sub_location = :sub, rack = :rack, rack_position = :rack_pos, status = :status, 
             type_id = :type, brand_id = :brand, model_id = :model, notes = :notes,
             updated_at = NOW()
             WHERE id = :id";
@@ -66,6 +67,7 @@ elseif ($method === 'PUT') {
             ':hostname' => $input['hostname'], ':ip' => $input['ip_address'] ?? null, ':serial' => $input['serial_number'],
             ':asset' => $input['asset_id'] ?? null, ':fw' => $input['firmware_version'] ?? null, 
             ':loc' => $input['location'] ?? null, ':sub' => $input['sub_location'] ?? null,
+            ':rack' => $input['rack'] ?? null, ':rack_pos' => $input['rack_position'] ?? null,
             ':status' => $input['status'] ?? 'Active', ':type' => $input['type_id'], ':brand' => $input['brand_id'],
             ':model' => $input['model_id'], ':notes' => $input['notes'] ?? null
         ]);

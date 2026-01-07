@@ -21,6 +21,10 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
+    <!-- React DND -->
+    <script src="https://cdn.jsdelivr.net/npm/react-dnd@14.0.5/dist/umd/ReactDnD.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dnd-html5-backend@14.1.0/dist/umd/ReactDnDHTML5Backend.min.js"></script>
+    
     <!-- Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -190,8 +194,8 @@
                             <button onClick={fetchData} className="p-2.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-xl transition-all"><i className="ph ph-arrows-clockwise text-xl"></i></button>
                         </div>
                         <div className="flex-1 overflow-auto table-container bg-white dark:bg-slate-850">
-                            <table className="w-full text-left border-collapse"><thead className="sticky-header text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/50"><tr>{[{k:'hostname',l:'Hostname'},{k:'ip_address',l:'IP Address'},{k:'brand',l:'Brand'},{k:'model',l:'Model'},{k:'firmware_version',l:'Firmware'},{k:'location',l:'Location'},{k:'status',l:'Status'}].map(h=>(<th key={h.k} onClick={()=>setSortConfig({key:h.k, direction:sortConfig.key===h.k&&sortConfig.direction==='ascending'?'descending':'ascending'})} className="px-6 py-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors select-none">{h.l} {sortConfig.key===h.k && <i className={`ph ${sortConfig.direction==='ascending'?'ph-caret-up':'ph-caret-down'} ml-1 align-middle`}></i>}</th>))}{user.role!=='viewer' && <th className="px-6 py-4 text-right">Actions</th>}</tr></thead>
-                                <tbody className="text-sm text-slate-600 dark:text-slate-400 divide-y divide-slate-100 dark:divide-slate-800">{processedInventory.map(item => { const eos = getEOSMeta(item.eos_date); return (<tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group"><td className="px-6 py-3.5"><div className="font-bold text-slate-800 dark:text-slate-200">{item.hostname}</div><div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">{item.serial_number || '-'}</div></td><td className="px-6 py-3.5 font-mono text-slate-500 dark:text-slate-400 text-xs bg-slate-50/50 dark:bg-slate-800/50 rounded-lg">{item.ip_address}</td><td className="px-6 py-3.5">{item.brand}</td><td className="px-6 py-3.5"><div>{item.model}</div>{item.eos_date && <div className={`inline-block mt-1 ${eos.class}`}>{eos.label}</div>}</td><td className="px-6 py-3.5 text-sm text-slate-500 dark:text-slate-400">{item.firmware_version || '-'}</td><td className="px-6 py-3.5"><div>{item.location}</div>{item.sub_location && <div className="text-xs text-slate-400 dark:text-slate-500">{item.sub_location}</div>}</td><td className="px-6 py-3.5"><span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${item.status==='Active'?'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-900/50':item.status==='Decommissioned'?'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700':'bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-900/50'}`}><span className={`w-1.5 h-1.5 rounded-full ${item.status==='Active'?'bg-emerald-500':item.status==='Decommissioned'?'bg-slate-400':'bg-blue-500'}`}></span>{item.status}</span></td>{user.role!=='viewer' && (<td className="px-6 py-3.5 text-right"><div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => onEdit(item)} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-all"><i className="ph ph-pencil-simple text-lg"></i></button><button onClick={() => onDelete(item.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"><i className="ph ph-trash text-lg"></i></button></div></td>)}</tr>); })}</tbody>
+                            <table className="w-full text-left border-collapse"><thead className="sticky-header text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/50"><tr>{[{k:'hostname',l:'Hostname'},{k:'ip_address',l:'IP Address'},{k:'brand',l:'Brand'},{k:'model',l:'Model'},{k:'location',l:'Location'},{k:'rack',l:'Rack'},{k:'rack_position',l:'Position'},{k:'status',l:'Status'}].map(h=>(<th key={h.k} onClick={()=>setSortConfig({key:h.k, direction:sortConfig.key===h.k&&sortConfig.direction==='ascending'?'descending':'ascending'})} className="px-6 py-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors select-none">{h.l} {sortConfig.key===h.k && <i className={`ph ${sortConfig.direction==='ascending'?'ph-caret-up':'ph-caret-down'} ml-1 align-middle`}></i>}</th>))}{user.role!=='viewer' && <th className="px-6 py-4 text-right">Actions</th>}</tr></thead>
+                                <tbody className="text-sm text-slate-600 dark:text-slate-400 divide-y divide-slate-100 dark:divide-slate-800">{processedInventory.map(item => { const eos = getEOSMeta(item.eos_date); return (<tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group"><td className="px-6 py-3.5"><div className="font-bold text-slate-800 dark:text-slate-200">{item.hostname}</div><div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">{item.serial_number || '-'}</div></td><td className="px-6 py-3.5 font-mono text-slate-500 dark:text-slate-400 text-xs bg-slate-50/50 dark:bg-slate-800/50 rounded-lg">{item.ip_address}</td><td className="px-6 py-3.5">{item.brand}</td><td className="px-6 py-3.5"><div>{item.model}</div>{item.eos_date && <div className={`inline-block mt-1 ${eos.class}`}>{eos.label}</div>}</td><td className="px-6 py-3.5">{item.location}</td><td className="px-6 py-3.5">{item.rack}</td><td className="px-6 py-3.5">{item.rack_position}</td><td className="px-6 py-3.5"><span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${item.status==='Active'?'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-900/50':item.status==='Decommissioned'?'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700':'bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-900/50'}`}><span className={`w-1.5 h-1.5 rounded-full ${item.status==='Active'?'bg-emerald-500':item.status==='Decommissioned'?'bg-slate-400':'bg-blue-500'}`}></span>{item.status}</span></td>{user.role!=='viewer' && (<td className="px-6 py-3.5 text-right"><div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => onEdit(item)} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-all"><i className="ph ph-pencil-simple text-lg"></i></button><button onClick={() => onDelete(item.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"><i className="ph ph-trash text-lg"></i></button></div></td>)}</tr>); })}</tbody>
                             </table>
                         </div>
                         <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-xs text-slate-400 dark:text-slate-500 text-right font-medium shrink-0">Showing {processedInventory.length} assets</div>
@@ -317,6 +321,169 @@
             );
         }
 
+        // --- RACK VIEW ---
+        function RackView({ inventory, onDeviceMove }) {
+            const { DndProvider, useDrag, useDrop } = ReactDnD;
+            const { HTML5Backend } = ReactDnDHTML5Backend;
+
+            const [locationFilter, setLocationFilter] = useState("");
+            const [openLocation, setOpenLocation] = useState(null);
+
+            const ItemTypes = { DEVICE: 'device' };
+
+            const Device = ({ device }) => {
+                const [{ isDragging }, drag] = useDrag(() => ({
+                    type: ItemTypes.DEVICE,
+                    item: { id: device.id, device, rackId: device.rack },
+                    collect: (monitor) => ({
+                        isDragging: !!monitor.isDragging(),
+                    }),
+                }));
+
+                return (
+                    <div ref={drag} style={{ opacity: isDragging ? 0.5 : 1 }} className="p-2 bg-blue-500 text-white rounded-md cursor-move text-center text-xs">
+                        {device.hostname}
+                    </div>
+                );
+            };
+
+            const RackSlot = ({ position, rackId, children, onDeviceMove }) => {
+                const [{ isOver }, drop] = useDrop(() => ({
+                    accept: ItemTypes.DEVICE,
+                    drop: (item) => {
+                        if (item.rackId === rackId) {
+                            onDeviceMove(item.device, position)
+                        } else {
+                            alert("Cannot move device to a different rack!");
+                        }
+                    },
+                    collect: (monitor) => ({
+                        isOver: !!monitor.isOver(),
+                    }),
+                }));
+
+                return (
+                    <div ref={drop} className={`h-8 border-b border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center ${isOver ? 'bg-green-200 dark:bg-green-900' : ''}`}>
+                        {children || <span className="text-gray-400 dark:text-gray-600 text-xs">{position.replace('U','')}</span>}
+                    </div>
+                );
+            };
+
+            const Rack = ({ rackName, devices, onDeviceMove }) => {
+                const slots = Array.from({ length: 42 }, (_, i) => 42 - i); // From 42 down to 1
+
+                const deviceMap = new Map();
+                devices.forEach(d => {
+                    const positionNumber = parseInt((d.rack_position || '').replace('U', ''), 10);
+                    if (!isNaN(positionNumber)) {
+                        deviceMap.set(positionNumber, d);
+                    }
+                });
+
+                return (
+                    <div className="bg-white dark:bg-slate-850 p-2 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800">
+                        <h3 className="text-lg font-bold mb-2 text-center text-slate-700 dark:text-slate-300">{rackName}</h3>
+                        <div className="flex">
+                            <div className="w-full bg-slate-50 dark:bg-slate-900 rounded">
+                                {slots.map(position => (
+                                    <RackSlot key={position} position={`U${position}`} rackId={rackName} onDeviceMove={onDeviceMove}>
+                                        {deviceMap.has(position) ? <Device device={deviceMap.get(position)} /> : null}
+                                    </RackSlot>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const racksByLocation = useMemo(() => {
+                const grouped = {};
+                inventory.forEach(device => {
+                    if (device.location && device.rack) {
+                        if (!grouped[device.location]) {
+                            grouped[device.location] = {};
+                        }
+                        if (!grouped[device.location][device.rack]) {
+                            grouped[device.location][device.rack] = [];
+                        }
+                        grouped[device.location][device.rack].push(device);
+                    }
+                });
+                return grouped;
+            }, [inventory]);
+            
+            const locations = useMemo(() => Object.keys(racksByLocation), [racksByLocation]);
+
+            useEffect(() => {
+                if (locations.length > 0 && !openLocation) {
+                    setOpenLocation(locations[0]);
+                }
+            }, [locations, openLocation]);
+            
+            const filteredRacks = useMemo(() => {
+                if (!locationFilter) return racksByLocation;
+                const result = {};
+                if (racksByLocation[locationFilter]) {
+                    result[locationFilter] = racksByLocation[locationFilter];
+                }
+                return result;
+            }, [locationFilter, racksByLocation]);
+
+            return (
+                <DndProvider backend={HTML5Backend}>
+                    <div className="p-8 animate-fade-in">
+                        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
+                            <h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Rack View</h2>
+                            <div className="relative w-full md:w-64">
+                                <i className="ph ph-map-pin absolute left-3 top-3 text-slate-400 dark:text-slate-500 z-10"></i>
+                                <select 
+                                    className="w-full pl-9 pr-8 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm appearance-none bg-white dark:bg-slate-900 dark:text-white focus:outline-none focus:border-brand-500" 
+                                    value={locationFilter} 
+                                    onChange={e => {
+                                        setLocationFilter(e.target.value);
+                                        setOpenLocation(e.target.value || (locations.length > 0 ? locations[0] : null));
+                                    }}>
+                                    <option value="">All Locations</option>
+                                    {locations.map(l => <option key={l} value={l}>{l}</option>)}
+                                </select>
+                                <i className="ph ph-caret-down absolute right-3 top-3 text-slate-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+
+                        {Object.keys(filteredRacks).length === 0 && (
+                            <div className="text-center py-12 bg-white dark:bg-slate-850 rounded-lg shadow-sm border border-dashed dark:border-slate-700">
+                                <p className="text-slate-500 dark:text-slate-400">No racks to display.</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Assign devices to a location and rack to see them here.</p>
+                            </div>
+                        )}
+
+                        {Object.entries(filteredRacks).map(([location, racks]) => (
+                            <div key={location} className="mb-4 bg-white dark:bg-slate-850 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                                <button 
+                                    className="w-full flex justify-between items-center p-4 text-left hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
+                                    onClick={() => setOpenLocation(openLocation === location ? null : location)}
+                                >
+                                    <h3 className="text-xl font-bold text-slate-700 dark:text-slate-300">{location}</h3>
+                                    <i className={`ph ph-caret-down text-xl transition-transform ${openLocation === location ? 'rotate-180' : ''}`}></i>
+                                </button>
+                                {openLocation === location && (
+                                    <div className="p-4 border-t border-slate-100 dark:border-slate-700">
+                                        <div className="flex overflow-x-auto gap-6 pb-4">
+                                            {Object.entries(racks).map(([rackName, devices]) => (
+                                                <div key={rackName} className="flex-shrink-0" style={{width: '280px'}}>
+                                                    <Rack rackName={rackName} devices={devices} onDeviceMove={onDeviceMove}/>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </DndProvider>
+            );
+        }
+
         // --- GLOBAL & APP RENDER ---
         function LogsView() {
             const [logs, setLogs] = useState([]);
@@ -325,7 +492,7 @@
         }
 
         function Layout({ user, currentView, onViewChange, onLogout, children }) {
-            const menuItems = [ { id: 'dashboard', label: 'Dashboard', icon: 'ph-chart-pie-slice' }, { id: 'inventory', label: 'Inventory', icon: 'ph-rows' }, { id: 'logs', label: 'Activity Logs', icon: 'ph-clipboard-text' }, ...(user.role !== 'viewer' ? [{ id: 'settings', label: 'Settings', icon: 'ph-gear' }] : []) ];
+            const menuItems = [ { id: 'dashboard', label: 'Dashboard', icon: 'ph-chart-pie-slice' }, { id: 'inventory', label: 'Inventory', icon: 'ph-rows' }, { id: 'rack', label: 'Rack View', icon: 'ph-stack' }, { id: 'logs', label: 'Activity Logs', icon: 'ph-clipboard-text' }, ...(user.role !== 'viewer' ? [{ id: 'settings', label: 'Settings', icon: 'ph-gear' }] : []) ];
             return (
                 <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
                     <aside className="w-64 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 z-20">
@@ -340,19 +507,19 @@
 
         // --- GLOBAL MODALS ---
         function DeviceModal({ isOpen, onClose, onSave, options, initialData }) {
-            const [form, setForm] = useState(initialData || { hostname:'', ip_address:'', serial_number:'', asset_id:'', firmware_version:'', location:'', sub_location:'', status:'Active', type_id:'', brand_id:'', model_id:'', notes:'' });
-            useEffect(() => { setForm(initialData || { hostname:'', ip_address:'', serial_number:'', asset_id:'', firmware_version:'', location:'', sub_location:'', status:'Active', type_id:'', brand_id:'', model_id:'', notes:'' }); }, [initialData]);
+            const [form, setForm] = useState(initialData || { hostname:'', ip_address:'', serial_number:'', asset_id:'', firmware_version:'', location:'', rack:'', rack_position:'', status:'Active', type_id:'', brand_id:'', model_id:'', notes:'' });
+            useEffect(() => { setForm(initialData || { hostname:'', ip_address:'', serial_number:'', asset_id:'', firmware_version:'', location:'', rack:'', rack_position:'', status:'Active', type_id:'', brand_id:'', model_id:'', notes:'' }); }, [initialData]);
             const brands = options?.brands || []; const models = options?.models || []; const filteredModels = models.filter(m => m.brand_id == form.brand_id);
             const handleChange = (e) => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
             const handleSelectChange = (name, value) => { setForm(prev => { if (name === 'brand_id') return { ...prev, [name]: value, model_id: '' }; return { ...prev, [name]: value }; }); };
             
-            return (<div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"><div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800"><h2 className="text-xl font-bold text-slate-800 dark:text-white">{initialData ? 'Edit Device' : 'Add New Device'}</h2><button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl">✕</button></div><form onSubmit={(e) => { e.preventDefault(); onSave(form); }} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6"><div className="col-span-1 md:col-span-2 bg-brand-50 dark:bg-brand-900/20 p-4 rounded-xl border border-brand-100 dark:border-brand-900/50"><h3 className="text-xs font-bold text-brand-700 dark:text-brand-300 uppercase tracking-wider mb-3">Core Identity</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Hostname</label><input required name="hostname" value={form.hostname} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Serial Number</label><input required name="serial_number" value={form.serial_number} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div></div></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Type</label><select required name="type_id" value={form.type_id} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800 dark:text-white"><option value="">Select Type</option>{(options.types||[]).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Status</label><select name="status" value={form.status} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800 dark:text-white"><option value="Active">Active</option><option value="In-Stock">In-Stock</option><option value="Decommissioned">Decommissioned</option></select></div><div><SearchableSelect label="Brand" options={brands} value={form.brand_id} onChange={(val)=>handleSelectChange('brand_id', val)} placeholder="Select Brand..."/></div><div><SearchableSelect label="Model" options={filteredModels} value={form.model_id} onChange={(val)=>handleSelectChange('model_id', val)} disabled={!form.brand_id} placeholder="Select Model..."/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Mgmt IP</label><input name="ip_address" value={form.ip_address||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Asset Tag</label><input name="asset_id" value={form.asset_id||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Location (Site)</label><input name="location" value={form.location||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Sub Location</label><input name="sub_location" value={form.sub_location||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Firmware</label><input name="firmware_version" value={form.firmware_version||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div className="col-span-1 md:col-span-2"><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Notes</label><textarea name="notes" value={form.notes||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" rows="2"></textarea></div><div className="col-span-1 md:col-span-2 flex justify-end gap-3 mt-4 border-t border-slate-100 dark:border-slate-800 pt-6"><button type="button" onClick={onClose} className="px-6 py-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors">Cancel</button><button type="submit" className="px-6 py-2.5 bg-brand-600 text-white rounded-lg font-bold hover:bg-brand-700 shadow-lg shadow-brand-200 dark:shadow-none transition-all transform hover:-translate-y-0.5">Save Device</button></div></form></div></div>);
+            return (<div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"><div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800"><h2 className="text-xl font-bold text-slate-800 dark:text-white">{initialData ? 'Edit Device' : 'Add New Device'}</h2><button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl">✕</button></div><form onSubmit={(e) => { e.preventDefault(); onSave(form); }} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6"><div className="col-span-1 md:col-span-2 bg-brand-50 dark:bg-brand-900/20 p-4 rounded-xl border border-brand-100 dark:border-brand-900/50"><h3 className="text-xs font-bold text-brand-700 dark:text-brand-300 uppercase tracking-wider mb-3">Core Identity</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Hostname</label><input required name="hostname" value={form.hostname} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Serial Number</label><input required name="serial_number" value={form.serial_number} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div></div></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Type</label><select required name="type_id" value={form.type_id} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800 dark:text-white"><option value="">Select Type</option>{(options.types||[]).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Status</label><select name="status" value={form.status} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800 dark:text-white"><option value="Active">Active</option><option value="In-Stock">In-Stock</option><option value="Decommissioned">Decommissioned</option></select></div><div><SearchableSelect label="Brand" options={brands} value={form.brand_id} onChange={(val)=>handleSelectChange('brand_id', val)} placeholder="Select Brand..."/></div><div><SearchableSelect label="Model" options={filteredModels} value={form.model_id} onChange={(val)=>handleSelectChange('model_id', val)} disabled={!form.brand_id} placeholder="Select Model..."/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Mgmt IP</label><input name="ip_address" value={form.ip_address||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Asset Tag</label><input name="asset_id" value={form.asset_id||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Location (Site)</label><input name="location" value={form.location||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Rack</label><input name="rack" value={form.rack} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Position</label><input name="rack_position" value={form.rack_position} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Firmware</label><input name="firmware_version" value={form.firmware_version||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div className="col-span-1 md:col-span-2"><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Notes</label><textarea name="notes" value={form.notes||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" rows="2"></textarea></div><div className="col-span-1 md:col-span-2 flex justify-end gap-3 mt-4 border-t border-slate-100 dark:border-slate-800 pt-6"><button type="button" onClick={onClose} className="px-6 py-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors">Cancel</button><button type="submit" className="px-6 py-2.5 bg-brand-600 text-white rounded-lg font-bold hover:bg-brand-700 shadow-lg shadow-brand-200 dark:shadow-none transition-all transform hover:-translate-y-0.5">Save Device</button></div></form></div></div>);
         }
 
         function ImportModal({ onClose, onDataUpdated }) {
             const toast = useToast();
             const [file, setFile] = useState(null); const [result, setResult] = useState(null); const [uploading, setUploading] = useState(false);
-            const downloadTemplate = () => { const h=["Hostname","IP","Serial","Type","Brand","Model","Location","SubLocation","Status"]; const s=["SW1","1.1.1.1","SN123","Switch","Cisco","C9300","Datacenter","Rack1","Active"]; const csv="data:text/csv;charset=utf-8,"+h.join(",")+"\n"+s.join(","); const a=document.createElement("a");a.href=encodeURI(csv);a.download="template.csv";a.click(); };
+            const downloadTemplate = () => { const h=["Hostname","IP","Serial","Type","Brand","Model","Location","Rack","RackPosition","Status"]; const s=["SW1","1.1.1.1","SN123","Switch","Cisco","C9300","Datacenter","A1","U42","Active"]; const csv="data:text/csv;charset=utf-8,"+h.join(",")+"\n"+s.join(","); const a=document.createElement("a");a.href=encodeURI(csv);a.download="template.csv";a.click(); };
             const handleUpload = (e) => { e.preventDefault(); if(!file) return toast("Select a file", "error"); setUploading(true); const fd=new FormData(); fd.append('file',file); axios.post('api/import.php',fd,{headers:{'Content-Type':'multipart/form-data'}}).then(res=>{setResult(res.data);setUploading(false);if(res.data.success){toast("Import Successful","success");onDataUpdated();}}).catch(e=>{toast("Import Failed","error");setUploading(false)}) };
             return (<div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"><div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md p-6"><div className="flex justify-between mb-6"><h2 className="font-bold text-lg text-slate-800 dark:text-white">Import CSV</h2><button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button></div><div className="mb-6 text-sm bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 p-4 rounded-xl border border-blue-100 dark:border-blue-800 flex items-center justify-between"><span>Get the correct CSV format</span><button onClick={downloadTemplate} className="text-xs bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-700 px-3 py-1.5 rounded-lg font-bold hover:shadow-sm dark:text-blue-200">Download</button></div>{!result ? <form onSubmit={handleUpload} className="space-y-4"><input type="file" onChange={e=>setFile(e.target.files[0])} className="w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-50 dark:file:bg-brand-900/30 file:text-brand-700 dark:file:text-brand-300 hover:file:bg-brand-100" /><button disabled={uploading} className="w-full bg-slate-900 dark:bg-slate-700 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-all">{uploading?"Uploading...":"Start Import"}</button></form> : <div><div className={`p-4 rounded-xl mb-4 text-sm font-medium ${result.success?'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300':'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>{result.message}</div><button onClick={()=>{onClose();setResult(null)}} className="w-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-3 rounded-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-700">Close</button></div>}</div></div>);
         }
@@ -385,10 +552,26 @@
             
             const handleSaveDevice = (formData) => {
                 if (!formData.brand_id || !formData.model_id) return alert("Please select Brand and Model.");
-                const method = editingDevice ? 'put' : 'post';
-                const payload = editingDevice ? { ...formData, id: editingDevice.id } : formData;
-                axios({ method, url: 'api/inventory.php', data: payload }).then(res => { if (res.data.error || res.data.message?.includes('Error')) alert(res.data.message || "Error"); else { setIsDeviceModalOpen(false); setEditingDevice(null); fetchData(); } }).catch(err => alert("Failed: " + err));
+                const method = formData.id ? 'put' : 'post';
+                const payload = formData;
+                axios({ method, url: 'api/inventory.php', data: payload })
+                    .then(res => { 
+                        if (res.data.error || res.data.message?.includes('Error')) {
+                            alert(res.data.message || "Error");
+                        } else {
+                            if(isDeviceModalOpen) setIsDeviceModalOpen(false);
+                            if(editingDevice) setEditingDevice(null);
+                            fetchData(); 
+                        }
+                    })
+                    .catch(err => alert("Failed: " + err.response?.data?.message || err.message));
             };
+
+            const handleDeviceMove = (device, newPosition) => {
+                const updatedDevice = { ...device, rack_position: newPosition };
+                handleSaveDevice(updatedDevice);
+            };
+
             const handleDelete = (id) => { if(confirm("Delete?")) axios.delete('api/inventory.php', {data:{id}}).then(fetchData); };
 
             const handleViewChange = (v) => {
@@ -419,13 +602,14 @@
 
             return (
                 <ToastProvider>
-                    <Layout user={user} currentView={view} onViewChange={handleViewChange} onLogout={()=>setUser(null)}>
+                    <Layout user={user} currentView={view} onViewChange={handleViewChange} onLogout={handleLogout}>
                         {view === 'dashboard' && <DashboardView inventory={inventory} onNavigateToRisks={()=>{ setRiskFilter(true); setView('inventory'); }} />}
                         {view === 'inventory' && <InventoryView {...dataProps} />}
+                        {view === 'rack' && <RackView inventory={inventory} onDeviceMove={handleDeviceMove} />}
                         {view === 'settings' && <SettingsView options={options} onDataUpdated={fetchData} currentUser={user} />}
                         {view === 'logs' && <LogsView />}
 
-                        {isDeviceModalOpen && <DeviceModal isOpen={true} onClose={()=>setIsDeviceModalOpen(false)} onSave={(fd)=>{const toast=window.tempToast; if(!fd.brand_id||!fd.model_id)return alert("Missing Brand/Model"); const m=editingDevice?'put':'post'; const p=editingDevice?{...fd, id:editingDevice.id}:fd; axios({method:m, url:'api/inventory.php', data:p}).then(res=>{if(res.data.success||res.data.message.includes('success')){setIsDeviceModalOpen(false);setEditingDevice(null);fetchData()}else alert(res.data.message)}).catch(e=>alert("Error"))}} options={options} initialData={editingDevice} />}
+                        {isDeviceModalOpen && <DeviceModal isOpen={true} onClose={()=>{setIsDeviceModalOpen(false); setEditingDevice(null);}} onSave={(fd)=>{ const p = editingDevice ? {...fd, id:editingDevice.id} : fd; handleSaveDevice(p); }} options={options} initialData={editingDevice} />}
                         {isImportOpen && <ImportModal onClose={()=>setIsImportOpen(false)} onDataUpdated={fetchData} />}
                     </Layout>
                 </ToastProvider>

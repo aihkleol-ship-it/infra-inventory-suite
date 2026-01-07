@@ -144,6 +144,8 @@ header('Content-Type: text/html; charset=utf-8');
                 `firmware_version` VARCHAR(50) DEFAULT NULL,
                 `location` VARCHAR(255) DEFAULT NULL,
                 `sub_location` VARCHAR(255) DEFAULT NULL,
+                `rack` VARCHAR(255) DEFAULT NULL,
+                `rack_position` VARCHAR(255) DEFAULT NULL,
                 `status` ENUM('Active', 'Decommissioned', 'In-Stock') DEFAULT 'Active',
                 `notes` TEXT DEFAULT NULL,
                 `type_id` INT NOT NULL,
@@ -181,9 +183,9 @@ header('Content-Type: text/html; charset=utf-8');
             (2, 'PowerEdge R740', '2027-12-31'), 
             (4, 'FortiGate 100F', '2028-11-30');
 
-            INSERT INTO `inventory` (`hostname`, `ip_address`, `serial_number`, `type_id`, `brand_id`, `model_id`, `location`, `sub_location`, `status`) VALUES 
-            ('SW-CORE-01', '192.168.1.1', 'FOC12345678', 2, 1, 1, 'HQ Server Room', 'Rack A1 - U40', 'Active'),
-            ('SRV-APP-01', '192.168.1.10', 'DEL12345678', 1, 2, 2, 'HQ Server Room', 'Rack B2 - U10', 'Active');
+            INSERT INTO `inventory` (`hostname`, `ip_address`, `serial_number`, `type_id`, `brand_id`, `model_id`, `location`, `sub_location`, `rack`, `rack_position`, `status`) VALUES 
+            ('SW-CORE-01', '192.168.1.1', 'FOC12345678', 2, 1, 1, 'HQ Server Room', 'Rack A1 - U40', 'A1', 'U40', 'Active'),
+            ('SRV-APP-01', '192.168.1.10', 'DEL12345678', 1, 2, 2, 'HQ Server Room', 'Rack B2 - U10', 'B2', 'U10', 'Active');
 
             SET FOREIGN_KEY_CHECKS = 1;
 SQL;
