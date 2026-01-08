@@ -104,6 +104,12 @@ header('Content-Type: text/html; charset=utf-8');
             $sql = <<<SQL
             SET FOREIGN_KEY_CHECKS = 0;
 
+            DROP TABLE IF EXISTS `system_settings`;
+            CREATE TABLE `system_settings` (
+                `setting_key` VARCHAR(100) NOT NULL PRIMARY KEY,
+                `setting_value` TEXT DEFAULT NULL
+            ) ENGINE=InnoDB;
+
             DROP TABLE IF EXISTS `users`;
             CREATE TABLE `users` (
                 `id` INT AUTO_INCREMENT PRIMARY KEY,

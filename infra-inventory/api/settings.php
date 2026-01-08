@@ -37,10 +37,13 @@ elseif ($method === 'POST') {
             
             // Save Recipient
             $stmt->execute(['alert_email_recipient', $data['alert_email'], $data['alert_email']]);
+            $stmt->closeCursor();
             
             // Save Gateway Details
-            $stmt->execute(['gateway_url', $data['gateway_url'], $data['gateway_url']]);
-            $stmt->execute(['gateway_key', $data['gateway_key'], $data['gateway_key']]);
+            $stmt->execute(['gateway_url', $data['gateway_url'] ?? null, $data['gateway_url'] ?? null]);
+            $stmt->closeCursor();
+            $stmt->execute(['gateway_key', $data['gateway_key'] ?? null, $data['gateway_key'] ?? null]);
+            $stmt->closeCursor();
             
             writeLog($pdo, 'CONFIG', 'Gateway Settings', 'Updated API connection details');
             echo json_encode(["success" => true, "message" => "Connection saved"]);
