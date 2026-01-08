@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infra-System Installation Guide</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+            border-bottom: 1px solid #ececec;
+            padding-bottom: 10px;
+        }
+        h1 { font-size: 2.5em; }
+        h2 { font-size: 2em; margin-top: 40px;}
+        h3 { font-size: 1.5em; margin-top: 30px;}
+        code {
+            background-color: #e8e8e8;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #2c3e50;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .note {
+            background-color: #fffbe6;
+            border-left: 4px solid #facc15;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .danger {
+            background-color: #feecf0;
+            border-left: 4px solid #e53e3e;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Infra-System Installation Guide</h1>
+    <p>This guide provides step-by-step instructions for installing the <strong>Infra-System</strong> application suite on a fresh Linux server (Ubuntu 22.04 LTS recommended).</p>
+
+    <h2>Step 1: Server Prerequisites</h2>
+    <p>First, we need to install the web server, database server, and PHP runtime environment.</p>
+
+    <h3>1.1. Update System</h3>
+    <p>Connect to your server via SSH and update the package lists:</p>
+    <pre><code>sudo apt update && sudo apt upgrade -y</code></pre>
+
+    <h3>1.2. Install Apache, MariaDB, and PHP</h3>
+    <p>We will install Apache as the web server, MariaDB as the database server, and PHP. The application requires the following PHP extensions: <code>pdo_mysql</code>, <code>curl</code>, and <code>json</code>.</p>
+    <pre><code>sudo apt install -y apache2 mariadb-server php libapache2-mod-php php-mysql php-curl php-json</code></pre>
+
+    <h3>1.3. Enable Apache Modules</h3>
+    <p>Enable the rewrite module for clean URLs.</p>
+    <pre><code>sudo a2enmod rewrite
+sudo systemctl restart apache2</code></pre>
+
+
+    <h2>Step 2: Database Setup</h2>
+    <p>Infra-System requires two separate databases: one for the Inventory and one for the Gateway.</p>
+
+    <h3>2.1. Secure MariaDB Installation</h3>
+    <p>Run the secure installation script to set a root password and remove insecure defaults.</p>
+    <pre><code>sudo mysql_secure_installation</code></pre>
+    <p class="note">You will be prompted to set a root password. Remember it for the next step.</p>
+
+    <h3>2.2. Create Databases and Users</h3>
+    <p>Log into the MariaDB shell as the root user:</p>
+    <pre><code>sudo mysql -u root -p</code></pre>
+    <p>Now, run the following SQL commands to create the databases and dedicated users. Replace <code>'your_strong_password'</code> with a secure password for each user.</p>
+
+    <p><strong>For Infra-Inventory:</strong></p>
+    <pre><code class="language-sql">CREATE DATABASE infra_inventory;
+CREATE USER 'infra_user'@'localhost' IDENTIFIED BY 'your_strong_password';
+GRANT ALL PRIVILEGES ON infra_inventory.* TO 'infra_user'@'localhost';</code></pre>
+
+    <p><strong>For Infra-Gateway:</strong></p>
+    <pre><code class="language-sql">CREATE DATABASE infra_gateway;
+CREATE USER 'gateway_user'@'localhost' IDENTIFIED BY 'another_strong_password';
+GRANT ALL PRIVILEGES ON infra_gateway.* TO 'gateway_user'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;</code></pre>
+
+    <h2>Step 3: Application Deployment</h2>
+
+    <h3>3.1. Clone the Repository</h3>
+    <p>Clone the application source code into the web server directory. We'll use <code>/var/www/infra-system</code>.</p>
+    <pre><code>sudo git clone https://github.com/your-repo/Infra-System.git /var/www/infra-system</code></pre>
+    <p class="note">Replace the URL with your actual Git repository URL.</p>
+
+    <h3>3.2. Configure Infra-Inventory</h3>
+    <p>The inventory application requires a configuration file with database credentials.</p>
+    <p>1. Copy the example configuration:</p>
+    <pre><code>sudo cp /var/www/infra-system/infra-inventory/api/config.php.example /var/www/infra-system/infra-inventory/api/config.php</code></pre>
+    <p>2. Open the new <code>config.php</code> file with a text editor (like nano):</p>
+    <pre><code>sudo nano /var/www/infra-system/infra-inventory/api/config.php</code></pre>
+    <p>3. Update the database variables with the credentials you created for <strong>infra_inventory</strong>:</p>
+    <pre><code>$host     = 'localhost';
+$username = 'infra_user';
+$password = 'your_strong_password';
+$db_name  = 'infra_inventory';</code></pre>
+    <p>Save and close the file (<code>Ctrl+X</code>, then <code>Y</code>, then <code>Enter</code> in nano).</p>
+    
+    <h3>3.3. Set File Permissions</h3>
+    <p>The web server needs to be able to read the files. Set the ownership to the Apache user (<code>www-data</code> on Ubuntu).</p>
+    <pre><code>sudo chown -R www-data:www-data /var/www/infra-system
+sudo chmod -R 755 /var/www/infra-system</code></pre>
+
+    <h2>Step 4: Web Server Configuration</h2>
+    <p>Create an Apache virtual host file to point a domain or IP to your application.</p>
+    <pre><code>sudo nano /etc/apache2/sites-available/infra-system.conf</code></pre>
+    <p>Paste the following configuration. Replace <code>your_server_domain_or_ip</code> with your server's public domain or IP address.</p>
+    <pre><code>&lt;VirtualHost *:80&gt;
+    ServerAdmin webmaster@localhost
+    ServerName your_server_domain_or_ip
+    DocumentRoot /var/www/infra-system/infra-inventory
+
+    &lt;Directory /var/www/infra-system/infra-inventory&gt;
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    &lt;/Directory&gt;
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+&lt;/VirtualHost&gt;</code></pre>
+    <p>Enable the new site and restart Apache:</p>
+    <pre><code>sudo a2ensite infra-system.conf
+sudo a2dissite 000-default.conf
+sudo systemctl restart apache2</code></pre>
+
+    <h2>Step 5: Run Web-Based Installers</h2>
+    <p>The final step is to run the setup scripts through your web browser.</p>
+
+    <h3>5.1. Install Infra-Inventory</h3>
+    <p>Navigate to: <code>http://your_server_domain_or_ip/api/setup_database.php</code></p>
+    <p>Since you already created <code>config.php</code>, the credentials should be pre-filled. Click the <strong>"Connect & Install"</strong> button. You should see a success message.</p>
+    <p class="note">The default login for the inventory is <code>admin</code> / <code>password123</code>.</p>
+
+    <h3>5.2. Install Infra-Gateway</h3>
+    <p>The gateway setup script is hard-coded to use 'root' with no password. We need to temporarily edit it to use the credentials we created.</p>
+    <p>1. Open the gateway setup file:</p>
+    <pre><code>sudo nano /var/www/infra-system/infra-gateway/api/setup.php</code></pre>
+    <p>2. Modify the credentials on line 3 to match your <strong>gateway_user</strong>:</p>
+    <pre><code>$host = 'localhost'; $user = 'gateway_user'; $pass = 'another_strong_password'; $dbname = 'infra_gateway';</code></pre>
+    <p>3. Save the file. Now navigate to: <code>http://your_server_domain_or_ip/../infra-gateway/api/setup.php</code></p>
+    <p>You should see a success message. The default admin for the gateway is <code>admin</code> / <code>secret123</code>.</p>
+
+    <h2>Step 6: Post-Installation</h2>
+    <h3>6.1. Secure Setup Files</h3>
+    <p class="danger"><strong>CRITICAL:</strong> Remove or rename the setup files to prevent unauthorized access.</p>
+    <pre><code>sudo mv /var/www/infra-system/infra-inventory/api/setup_database.php /var/www/infra-system/infra-inventory/api/setup_database.php.installed
+sudo mv /var/www/infra-system/infra-gateway/api/setup.php /var/www/infra-system/infra-gateway/api/setup.php.installed</code></pre>
+    
+    <h3>6.2. Set Up Cron Job</h3>
+    <p>The application needs a cron job to run periodic tasks like the End-of-Support report.</p>
+    <p>Open the crontab for the web server user:</p>
+    <pre><code>sudo -u www-data crontab -e</code></pre>
+    <p>Add the following line to run the script every day at midnight:</p>
+    <pre><code>0 0 * * * /usr/bin/php /var/www/infra-system/infra-inventory/api/cron_eos_report.php</code></pre>
+
+    <h2>Installation Complete!</h2>
+    <p>Your Infra-System inventory application should now be accessible at <code>http://your_server_domain_or_ip</code>. You can log in with the credentials created during the setup process.</p>
+
+</body>
+</html>
