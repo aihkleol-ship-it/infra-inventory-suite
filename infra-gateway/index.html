@@ -148,29 +148,142 @@
 
         function ConfigView({ config, onRefresh }) {
             const [form, setForm] = useState(config || {});
-            useEffect(() => setForm(config || {}), [config]);
-            const save = (e) => { e.preventDefault(); axios.post('api/admin.php', {action: 'save_smtp', ...form}).then(() => { alert("Saved!"); onRefresh(); }).catch(e => alert(e.response?.data?.message)); };
+            const [zabbixForm, setZabbixForm] = useState({
+                url: config?.zabbix_url || '',
+                token: ''
+            });
+
+            useEffect(() => {
+                setForm(config || {});
+                setZabbixForm({
+                    url: config?.zabbix_url || '',
+                    token: ''
+                });
+            }, [config]);
+
+            const saveSmtp = (e) => {
+                e.preventDefault();
+                axios.post('api/admin.php', {action: 'save_smtp', ...form})
+                    .then(() => { alert("SMTP settings saved!"); onRefresh(); })
+                    .catch(e => alert(e.response?.data?.message || "Error saving SMTP settings"));
+            };
+
+            const saveZabbix = (e) => {
+                e.preventDefault();
+                axios.post('api/admin.php', {
+                    action: 'save_zabbix',
+                    url: zabbixForm.url,
+                    token: zabbixForm.token
+                })
+                    .then(() => { alert("Zabbix settings saved!"); onRefresh(); setZabbixForm(f => ({ ...f, token: '' })); })
+                    .catch(e => alert(e.response?.data?.message || "Error saving Zabbix settings"));
+            };
 
             return (
-                <div className="p-8 max-w-2xl mx-auto animate-fade-in">
-                    <h2 className="text-2xl font-bold text-white mb-6">SMTP Configuration</h2>
-                    <div className="bg-slate-800 p-8 rounded-xl border border-slate-700">
-                        <form onSubmit={save} className="space-y-5">
-                            <div className="grid grid-cols-2 gap-5">
-                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Host</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.host||''} onChange={e=>setForm({...form, host:e.target.value})} /></div>
-                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Port</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.port||''} onChange={e=>setForm({...form, port:e.target.value})} /></div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-5">
-                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Username</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.user||''} onChange={e=>setForm({...form, user:e.target.value})} /></div>
-                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Password</label><input type="password" className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.pass||''} onChange={e=>setForm({...form, pass:e.target.value})} placeholder="••••••" /></div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-5">
-                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Encryption</label><select className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.encryption||'tls'} onChange={e=>setForm({...form, encryption:e.target.value})}><option value="tls">TLS</option><option value="ssl">SSL</option><option value="">None</option></select></div>
-                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">From Name</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.from_name||''} onChange={e=>setForm({...form, from_name:e.target.value})} /></div>
-                            </div>
-                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">From Email</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.from_email||''} onChange={e=>setForm({...form, from_email:e.target.value})} /></div>
-                            <button className="w-full bg-blue-600 text-white font-bold py-3 rounded hover:bg-blue-500">Update Settings</button>
-                        </form>
+                <div className="p-8 max-w-3xl mx-auto animate-fade-in space-y-8">
+                    {/* SMTP */}
+                    <div>
+                        <h2 className="text-2xl font-bold text-white mb-3">SMTP Configuration</h2>
+                        <p className="text-slate-400 text-sm mb-4">Used for email delivery from InfraGateway.</p>
+                        <div className="bg-slate-800 p-8 rounded-xl border border-slate-700">
+                            <form onSubmit={saveSmtp} className="space-y-5">
+                                <div className="grid grid-cols-2 gap-5">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Host</label>
+                                        <input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
+                                               value={form.host||''}
+                                               onChange={e=>setForm({...form, host:e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Port</label>
+                                        <input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
+                                               value={form.port||''}
+                                               onChange={e=>setForm({...form, port:e.target.value})} />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-5">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Username</label>
+                                        <input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
+                                               value={form.user||''}
+                                               onChange={e=>setForm({...form, user:e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Password</label>
+                                        <input type="password" className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
+                                               value={form.pass||''}
+                                               onChange={e=>setForm({...form, pass:e.target.value})}
+                                               placeholder="••••••" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-5">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Encryption</label>
+                                        <select className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
+                                                value={form.encryption||'tls'}
+                                                onChange={e=>setForm({...form, encryption:e.target.value})}>
+                                            <option value="tls">TLS</option>
+                                            <option value="ssl">SSL</option>
+                                            <option value="">None</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">From Name</label>
+                                        <input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
+                                               value={form.from_name||''}
+                                               onChange={e=>setForm({...form, from_name:e.target.value})} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">From Email</label>
+                                    <input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
+                                           value={form.from_email||''}
+                                           onChange={e=>setForm({...form, from_email:e.target.value})} />
+                                </div>
+                                <button className="w-full bg-blue-600 text-white font-bold py-3 rounded hover:bg-blue-500">
+                                    Update SMTP Settings
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    {/* Zabbix */}
+                    <div>
+                        <h2 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
+                            <i className="ph ph-graph"></i> Zabbix Integration
+                        </h2>
+                        <p className="text-slate-400 text-sm mb-4">
+                            Configure how InfraGateway connects to your Zabbix server. These settings are used by dependent apps (e.g. InfraInventory).
+                        </p>
+                        <div className="bg-slate-800 p-8 rounded-xl border border-slate-700">
+                            <form onSubmit={saveZabbix} className="space-y-5">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Zabbix URL</label>
+                                    <input
+                                        className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
+                                        placeholder="e.g. http://zabbix.local or http://192.168.1.10/zabbix"
+                                        value={zabbixForm.url}
+                                        onChange={e=>setZabbixForm({...zabbixForm, url:e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">API Token</label>
+                                    <input
+                                        type="password"
+                                        className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
+                                        placeholder={config?.zabbix_token_set ? "Token already set (leave blank to keep current)" : "Paste API token from Zabbix"}
+                                        value={zabbixForm.token}
+                                        onChange={e=>setZabbixForm({...zabbixForm, token:e.target.value})}
+                                    />
+                                    <p className="text-xs text-slate-500 mt-2">
+                                        Create an API token in Zabbix (Administration → API tokens) and paste it here. For security reasons, the existing token is never shown.
+                                    </p>
+                                </div>
+                                <button className="w-full bg-emerald-600 text-white font-bold py-3 rounded hover:bg-emerald-500">
+                                    Update Zabbix Settings
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             );

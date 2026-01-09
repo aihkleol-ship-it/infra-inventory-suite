@@ -74,6 +74,9 @@ if ($method === 'GET') {
             "encryption" => $settings['smtp_encryption'] ?? 'tls',
             "from_email" => $settings['smtp_from_email'] ?? '',
             "from_name" => $settings['smtp_from_name'] ?? '',
+            // Zabbix integration (do not expose raw token)
+            "zabbix_url" => $settings['zabbix_url'] ?? '',
+            "zabbix_token_set" => !empty($settings['zabbix_token'] ?? ''),
         ]
     ]);
 } 
@@ -100,6 +103,20 @@ elseif ($method === 'POST') {
         ];
         if (!empty($input['pass']) && $input['pass'] !== '******') {
             $updates['smtp_pass'] = $input['pass'];
+        }
+        $stmt = $pdo->prepare("REPLACE INTO gateway_settings (setting_key, setting_value) VALUES (?, ?)");
+        foreach ($updates as $k => $v) $stmt->execute([$k, $v]);
+        echo json_encode(["success"=>true]);
+    }
+
+    // Zabbix Config
+    elseif ($input['action'] === 'save_zabbix') {
+        $updates = [
+            'zabbix_url' => trim($input['url'] ?? ''),
+        ];
+        // 只有在使用者真的有輸入新 token 時才更新，避免覆蓋原值
+        if (!empty($input['token']) && $input['token'] !== '******') {
+            $updates['zabbix_token'] = $input['token'];
         }
         $stmt = $pdo->prepare("REPLACE INTO gateway_settings (setting_key, setting_value) VALUES (?, ?)");
         foreach ($updates as $k => $v) $stmt->execute([$k, $v]);

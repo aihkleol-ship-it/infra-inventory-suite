@@ -17,7 +17,7 @@ try {
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
-    // 2. Settings Table (SMTP Config)
+    // 2. Settings Table (SMTP / Zabbix Config)
     $pdo->exec("CREATE TABLE IF NOT EXISTS `gateway_settings` (
         `setting_key` VARCHAR(50) PRIMARY KEY,
         `setting_value` TEXT
@@ -42,10 +42,21 @@ try {
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
     
-    // Seed Settings
+    // Seed Settings (SMTP + Zabbix)
     $defaults = [
-        'smtp_host' => 'smtp.gmail.com', 'smtp_port' => '587', 'smtp_user' => '', 'smtp_pass' => '',
-        'smtp_encryption' => 'tls', 'smtp_from_email' => 'gateway@local', 'smtp_from_name' => 'Gateway'
+        // SMTP (existing)
+        'smtp_host' => 'smtp.gmail.com',
+        'smtp_port' => '587',
+        'smtp_user' => '',
+        'smtp_pass' => '',
+        'smtp_encryption' => 'tls',
+        'smtp_from_email' => 'gateway@local',
+        'smtp_from_name' => 'Gateway',
+        // Zabbix (new)
+        // Example: http://zabbix.local or http://192.168.1.10/zabbix
+        'zabbix_url' => '',
+        // Prefer using an API token created in Zabbix (Administration → API tokens)
+        'zabbix_token' => ''
     ];
     $stmt = $pdo->prepare("INSERT IGNORE INTO gateway_settings (setting_key, setting_value) VALUES (?, ?)");
     foreach ($defaults as $k => $v) $stmt->execute([$k, $v]);
