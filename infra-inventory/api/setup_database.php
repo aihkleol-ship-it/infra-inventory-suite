@@ -1,6 +1,7 @@
 <?php
 /**
- * InfraInventory V4.1 - Smart Database Installation Script
+ * InfraInventory - Unified Database Installer & Migrator
+ * This script handles both fresh installations and schema upgrades.
  * Features: Reads config.php for credentials, allows manual override.
  */
 
@@ -54,7 +55,7 @@ header('Content-Type: text/html; charset=utf-8');
 <body>
 
 <div class="card">
-    <h1>🚀 Installer Setup</h1>
+    <h1>🚀 System Installer & Upgrader</h1>
     
     <?php if ($_SERVER['REQUEST_METHOD'] !== 'POST'): ?>
         <p style="text-align:center; color:#64748b; font-size:14px; margin-bottom:25px;">
@@ -77,7 +78,7 @@ header('Content-Type: text/html; charset=utf-8');
                 <label>Database Name (Will be Created)</label>
                 <input type="text" value="<?= htmlspecialchars($db_name) ?>" disabled style="background:#f1f5f9; color:#94a3b8;">
             </div>
-            <button type="submit" class="btn">Connect & Install</button>
+            <button type="submit" class="btn">Connect & Install / Upgrade</button>
         </form>
     <?php else: ?>
         
@@ -88,123 +89,112 @@ header('Content-Type: text/html; charset=utf-8');
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             
             echo "<div class='log'>";
-            echo "> Authenticated with MySQL successfully.\n";
+            echo "✓ Authenticated with MySQL server successfully.\n";
 
             // 2. Create Database
             $pdo->exec("CREATE DATABASE IF NOT EXISTS `$db_name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-            echo "> Database '$db_name' checked/created.\n";
+            echo "✓ Database '$db_name' checked/created.\n";
             
             $pdo->exec("USE `$db_name`");
+            echo "✓ Connected to database '$db_name'.\n\n";
 
-            // --- CRITICAL FIX: Generate Hash Dynamically ---
-            // This ensures 'password123' works on THIS specific server environment.
-            $pHash = password_hash('password123', PASSWORD_DEFAULT);
+            // 3. Check if this is a fresh install or an upgrade
+            $stmt = $pdo->query("SHOW TABLES LIKE 'inventory'");
+            $isFreshInstall = $stmt->rowCount() === 0;
 
-            // 3. Schema V4.1 (Full Schema)
-            $sql = <<<SQL
-            SET FOREIGN_KEY_CHECKS = 0;
+            if ($isFreshInstall) {
+                echo "→ Detected fresh installation. Setting up schema...\n";
 
-            DROP TABLE IF EXISTS `system_settings`;
-            CREATE TABLE `system_settings` (
-                `setting_key` VARCHAR(100) NOT NULL PRIMARY KEY,
-                `setting_value` TEXT DEFAULT NULL
-            ) ENGINE=InnoDB;
+                // --- CRITICAL FIX: Generate Hash Dynamically ---
+                $pHash = password_hash('password123', PASSWORD_DEFAULT);
 
-            DROP TABLE IF EXISTS `users`;
-            CREATE TABLE `users` (
-                `id` INT AUTO_INCREMENT PRIMARY KEY,
-                `username` VARCHAR(50) NOT NULL UNIQUE,
-                `password_hash` VARCHAR(255) NOT NULL,
-                `role` VARCHAR(20) DEFAULT 'editor',
-                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
+                // 4. Schema V4.1 (Full Schema)
+                $sql = <<<SQL
+                SET FOREIGN_KEY_CHECKS = 0;
 
-            DROP TABLE IF EXISTS `device_types`;
-            CREATE TABLE `device_types` (
-                `id` INT AUTO_INCREMENT PRIMARY KEY,
-                `name` VARCHAR(50) NOT NULL UNIQUE
-            ) ENGINE=InnoDB;
+                DROP TABLE IF EXISTS `system_settings`, `users`, `device_types`, `brands`, `models`, `inventory`, `audit_logs`;
 
-            DROP TABLE IF EXISTS `brands`;
-            CREATE TABLE `brands` (
-                `id` INT AUTO_INCREMENT PRIMARY KEY,
-                `name` VARCHAR(50) NOT NULL UNIQUE
-            ) ENGINE=InnoDB;
+                CREATE TABLE `system_settings` ( `setting_key` VARCHAR(100) NOT NULL PRIMARY KEY, `setting_value` TEXT DEFAULT NULL ) ENGINE=InnoDB;
+                CREATE TABLE `users` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `username` VARCHAR(50) NOT NULL UNIQUE, `password_hash` VARCHAR(255) NOT NULL, `role` VARCHAR(20) DEFAULT 'editor', `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ) ENGINE=InnoDB;
+                CREATE TABLE `device_types` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(50) NOT NULL UNIQUE ) ENGINE=InnoDB;
+                CREATE TABLE `brands` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(50) NOT NULL UNIQUE ) ENGINE=InnoDB;
+                CREATE TABLE `models` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `brand_id` INT NOT NULL, `name` VARCHAR(100) NOT NULL, `eos_date` DATE DEFAULT NULL, FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE ) ENGINE=InnoDB;
+                CREATE TABLE `audit_logs` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `user_id` INT, `username` VARCHAR(50), `action` VARCHAR(20), `target` VARCHAR(100), `details` TEXT, `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ) ENGINE=InnoDB;
 
-            DROP TABLE IF EXISTS `models`;
-            CREATE TABLE `models` (
-                `id` INT AUTO_INCREMENT PRIMARY KEY,
-                `brand_id` INT NOT NULL,
-                `name` VARCHAR(100) NOT NULL,
-                `eos_date` DATE DEFAULT NULL,
-                FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE
-            ) ENGINE=InnoDB;
+                CREATE TABLE `inventory` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    `hostname` VARCHAR(100) NOT NULL,
+                    `ip_address` VARCHAR(45) DEFAULT NULL,
+                    `serial_number` VARCHAR(100) NOT NULL UNIQUE,
+                    `asset_id` VARCHAR(50) DEFAULT NULL,
+                    `firmware_version` VARCHAR(50) DEFAULT NULL,
+                    `location` VARCHAR(255) DEFAULT NULL,
+                    `sub_location` VARCHAR(255) DEFAULT NULL,
+                    `rack` VARCHAR(255) DEFAULT NULL,
+                    `rack_position` VARCHAR(255) DEFAULT NULL,
+                    `status` ENUM('Active', 'Decommissioned', 'In-Stock') DEFAULT 'Active',
+                    `notes` TEXT DEFAULT NULL,
+                    `type_id` INT NOT NULL,
+                    `brand_id` INT NOT NULL,
+                    `model_id` INT NOT NULL,
+                    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (`type_id`) REFERENCES `device_types`(`id`),
+                    FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`),
+                    FOREIGN KEY (`model_id`) REFERENCES `models`(`id`)
+                ) ENGINE=InnoDB;
 
-            DROP TABLE IF EXISTS `inventory`;
-            CREATE TABLE `inventory` (
-                `id` INT AUTO_INCREMENT PRIMARY KEY,
-                `hostname` VARCHAR(100) NOT NULL,
-                `ip_address` VARCHAR(45) DEFAULT NULL,
-                `serial_number` VARCHAR(100) NOT NULL UNIQUE,
-                `asset_id` VARCHAR(50) DEFAULT NULL,
-                `firmware_version` VARCHAR(50) DEFAULT NULL,
-                `location` VARCHAR(255) DEFAULT NULL,
-                `sub_location` VARCHAR(255) DEFAULT NULL,
-                `rack` VARCHAR(255) DEFAULT NULL,
-                `rack_position` VARCHAR(255) DEFAULT NULL,
-                `status` ENUM('Active', 'Decommissioned', 'In-Stock') DEFAULT 'Active',
-                `notes` TEXT DEFAULT NULL,
-                `type_id` INT NOT NULL,
-                `brand_id` INT NOT NULL,
-                `model_id` INT NOT NULL,
-                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (`type_id`) REFERENCES `device_types`(`id`),
-                FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`),
-                FOREIGN KEY (`model_id`) REFERENCES `models`(`id`)
-            ) ENGINE=InnoDB;
+                -- Seed Data
+                INSERT INTO `users` (`username`, `password_hash`, `role`) VALUES 
+                ('admin', '$pHash', 'admin'),
+                ('viewer', '$pHash', 'viewer');
 
-            DROP TABLE IF EXISTS `audit_logs`;
-            CREATE TABLE `audit_logs` (
-                `id` INT AUTO_INCREMENT PRIMARY KEY,
-                `user_id` INT,
-                `username` VARCHAR(50),
-                `action` VARCHAR(20),
-                `target` VARCHAR(100),
-                `details` TEXT,
-                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
+                INSERT INTO `device_types` (`name`) VALUES ('Server'), ('Switch'), ('Router'), ('Firewall'), ('Storage'), ('PDU');
+                INSERT INTO `brands` (`name`) VALUES ('Cisco'), ('Dell'), ('HP'), ('Fortinet'), ('Synology');
+                
+                INSERT INTO `models` (`brand_id`, `name`, `eos_date`) VALUES 
+                (1, 'Catalyst 9300', '2030-01-01'), 
+                (2, 'PowerEdge R740', '2027-12-31'), 
+                (4, 'FortiGate 100F', '2028-11-30');
 
-            -- Seed Data
-            -- Uses the dynamically generated hash $pHash for 'password123'
-            INSERT INTO `users` (`username`, `password_hash`, `role`) VALUES 
-            ('admin', '$pHash', 'admin'),
-            ('viewer', '$pHash', 'viewer');
+                INSERT INTO `inventory` (`hostname`, `ip_address`, `serial_number`, `type_id`, `brand_id`, `model_id`, `location`, `sub_location`, `rack`, `rack_position`, `status`) VALUES 
+                ('SW-CORE-01', '192.168.1.1', 'FOC12345678', 2, 1, 1, 'HQ Server Room', 'Rack A1 - U40', 'A1', 'U40', 'Active'),
+                ('SRV-APP-01', '192.168.1.10', 'DEL12345678', 1, 2, 2, 'HQ Server Room', 'Rack B2 - U10', 'B2', 'U10', 'Active');
 
-            INSERT INTO `device_types` (`name`) VALUES ('Server'), ('Switch'), ('Router'), ('Firewall'), ('Storage'), ('PDU');
-            INSERT INTO `brands` (`name`) VALUES ('Cisco'), ('Dell'), ('HP'), ('Fortinet'), ('Synology');
-            
-            INSERT INTO `models` (`brand_id`, `name`, `eos_date`) VALUES 
-            (1, 'Catalyst 9300', '2030-01-01'), 
-            (2, 'PowerEdge R740', '2027-12-31'), 
-            (4, 'FortiGate 100F', '2028-11-30');
-
-            INSERT INTO `inventory` (`hostname`, `ip_address`, `serial_number`, `type_id`, `brand_id`, `model_id`, `location`, `sub_location`, `rack`, `rack_position`, `status`) VALUES 
-            ('SW-CORE-01', '192.168.1.1', 'FOC12345678', 2, 1, 1, 'HQ Server Room', 'Rack A1 - U40', 'A1', 'U40', 'Active'),
-            ('SRV-APP-01', '192.168.1.10', 'DEL12345678', 1, 2, 2, 'HQ Server Room', 'Rack B2 - U10', 'B2', 'U10', 'Active');
-
-            SET FOREIGN_KEY_CHECKS = 1;
+                SET FOREIGN_KEY_CHECKS = 1;
 SQL;
-            
-            // Execute SQL commands
-            $pdo->exec($sql);
-            echo "> Tables created.\n";
-            echo "> Seed data inserted.\n";
+                
+                $pdo->exec($sql);
+                echo "✓ All tables created successfully.\n";
+                echo "✓ Default data seeded.\n";
+            } else {
+                echo "→ Detected existing installation. Checking for upgrades...\n";
+                
+                // --- MIGRATION LOGIC ---
+                // Check for migration from v1.0 (add rack and rack_position)
+                $invColumns = $pdo->query("SHOW COLUMNS FROM `inventory` LIKE 'rack'")->rowCount();
+                if ($invColumns === 0) {
+                    echo "  → Applying v1.0 migration (adding rack/position columns)...\n";
+                    $pdo->exec("ALTER TABLE `inventory` 
+                                ADD COLUMN `rack` VARCHAR(255) DEFAULT NULL AFTER `sub_location`,
+                                ADD COLUMN `rack_position` VARCHAR(255) DEFAULT NULL AFTER `rack`;");
+                    echo "  ✓ Migration v1.0 complete.\n";
+                } else {
+                    echo "  ✓ Schema is up to date.\n";
+                }
+
+                // Add future migration checks here in else-if blocks
+            }
+
             echo "</div>";
             
             echo "<div class='success-box'>";
-            echo "<h3 style='color:green; font-size:20px;'>✅ Installation Successful!</h3>";
-            echo "<p style='color:#64748b;'>You can now log in with <b>admin / password123</b></p>";
+            echo "<h3 style='color:green; font-size:20px;'>✅ System Ready!</h3>";
+            if ($isFreshInstall) {
+                echo "<p style='color:#64748b;'>Installation complete. You can now log in with <b>admin / password123</b></p>";
+            } else {
+                echo "<p style='color:#64748b;'>Upgrade process complete. Your system is up to date.</p>";
+            }
             echo "<a href='../index.html' class='btn' style='background:#10b981; margin-top:15px; text-decoration:none; display:inline-block; width:auto; padding:10px 30px;'>Go to Login</a>";
             echo "</div>";
 
