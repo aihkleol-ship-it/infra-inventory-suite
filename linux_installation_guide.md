@@ -141,7 +141,7 @@ cd /var/www/html
 sudo rm index.html
 
 # Clone your project files here. If you have them in a git repo:
-# sudo git clone https://github.com/your-repo/infra-inventory-suite.git .
+# sudo git clone https://github.com/aihkleol-ship-it/infra-inventory-suite.git .
 # For this example, we'll assume you are copying files into /var/www/html/
 # Ensure the final structure is /var/www/html/index.html, /var/www/html/api/, etc.
 ```
@@ -162,7 +162,7 @@ sudo chmod -R 755 /var/www/html
 Edit the application's configuration file to use the database credentials you created.
 
 ```bash
-sudo nano /var/www/html/api/config.php
+sudo nano /var/www/html/infra-inventory-suite/infra-inventoryapi/api/config.php
 ```
 
 Modify the database connection variables to match the user and password from step 3.1.
@@ -185,7 +185,7 @@ Press `CTRL+X`, then `Y`, then `Enter` to save and exit `nano`.
 
 Open your web browser and navigate to the automated setup script using your server's IP address.
 
-**http://YOUR_SERVER_IP/api/setup_database.php**
+**http://YOUR_SERVER_IP/infra-inventory-suite/infra-inventoryapi/api/setup_database.php**
 
 You should see a page with a "Connect & Install" button. Click it. Upon completion, a "✅ Installation Successful!" message will appear.
 
@@ -194,7 +194,7 @@ You should see a page with a "Connect & Install" button. Click it. Upon completi
 Immediately after successful installation, **you must delete the setup script** to prevent unauthorized database resets.
 
 ```bash
-sudo rm /var/www/html/api/setup_database.php
+sudo rm /var/www/html/infra-inventory-suite/infra-inventoryapi/api/setup_database.php
 ```
 
 ### 4.3. Log In
