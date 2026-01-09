@@ -18,8 +18,8 @@ class Mailer {
     }
 
     private function loadSettings() {
-        $stmt = $this->pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key LIKE 'smtp_%'");
-        $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        $stmt = $this->pdo->query("SELECT setting_key, setting_value FROM gateway_settings WHERE setting_key LIKE 'smtp_%'");
+        $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // This table is in the 'infra_gateway' DB
 
         $this->host = $settings['smtp_host'] ?? 'localhost';
         $this->port = $settings['smtp_port'] ?? 25;
