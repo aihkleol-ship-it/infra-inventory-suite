@@ -219,13 +219,30 @@
                                 <div className="grid grid-cols-2 gap-5">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Encryption</label>
-                                        <select className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
-                                                value={form.encryption||'tls'}
-                                                onChange={e=>setForm({...form, encryption:e.target.value})}>
+                                        <select
+                                            className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
+                                            value={form.encryption ?? 'tls'}
+                                            onChange={e => {
+                                                const enc = e.target.value;
+                                                // UX: 如果選 None 且目前是預設 587/465，就自動切到 25
+                                                let nextPort = form.port;
+                                                if (enc === '' && (!nextPort || nextPort === '587' || nextPort === '465')) {
+                                                    nextPort = '25';
+                                                }
+                                                setForm({
+                                                    ...form,
+                                                    encryption: enc,
+                                                    port: nextPort
+                                                });
+                                            }}
+                                        >
                                             <option value="tls">TLS</option>
                                             <option value="ssl">SSL</option>
                                             <option value="">None</option>
                                         </select>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            For plain SMTP (no encryption), use port 25.
+                                        </p>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">From Name</label>
