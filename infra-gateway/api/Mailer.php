@@ -13,13 +13,13 @@ class Mailer {
     private function loadSettings() {
         $stmt = $this->pdo->query("SELECT setting_key, setting_value FROM gateway_settings");
         $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-        $this->host = $settings['smtp_host'];
-        $this->port = $settings['smtp_port'];
-        $this->user = $settings['smtp_user'];
-        $this->pass = $settings['smtp_pass'];
-        $this->enc  = $settings['smtp_encryption'];
-        $this->fromEmail = $settings['smtp_from_email'];
-        $this->fromName  = $settings['smtp_from_name'];
+        $this->host = $settings['smtp_host'] ?? 'localhost';
+        $this->port = $settings['smtp_port'] ?? 25;
+        $this->user = $settings['smtp_user'] ?? '';
+        $this->pass = $settings['smtp_pass'] ?? '';
+        $this->enc  = $settings['smtp_encryption'] ?? ''; // e.g., 'tls', 'ssl'
+        $this->fromEmail = $settings['smtp_from_email'] ?? 'noreply@gateway.local';
+        $this->fromName  = $settings['smtp_from_name'] ?? 'InfraGateway';
     }
 
     public function send($to, $subject, $htmlBody) {

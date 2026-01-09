@@ -9,9 +9,14 @@ include_once 'Mailer.php';
 
 // 2. Validate API Key
 $headers = apache_request_headers();
-$auth = $headers['Authorization'] ?? '';
-$key = str_replace('Bearer ', '', $auth);
-
+// Standardize on X-API-Key, but allow Authorization for backward compatibility
+$key = $headers['X-API-Key'] ?? '';
+if (empty($key)) {
+    $auth = $headers['Authorization'] ?? '';
+    if (strpos($auth, 'Bearer ') === 0) {
+        $key = substr($auth, 7);
+    }
+}
 $stmt = $pdo->prepare("SELECT id, app_name FROM gateway_clients WHERE api_key = ? AND status = 'active'");
 $stmt->execute([$key]);
 $client = $stmt->fetch(PDO::FETCH_ASSOC);
