@@ -54,6 +54,11 @@ try {
             'smtp_encryption' => 'tls',
             'smtp_port' => 587
         ];
+    } elseif ($test_case === 'ssl') {
+        $payload_data['override_smtp'] = [
+            'smtp_encryption' => 'ssl',
+            'smtp_port' => 465
+        ];
     }
 
     $payload = json_encode($payload_data);
