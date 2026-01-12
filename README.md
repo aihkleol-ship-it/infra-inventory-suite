@@ -1,94 +1,33 @@
-# Infra Inventory Suite
+# Infra-System
 
-A modern, lightweight, and responsive web application for managing IT infrastructure assets. Keep track of your servers, network devices, and more with an intuitive interface, visual rack layouts, and robust administrative features.
+Infra-System is a comprehensive suite of tools designed for managing IT infrastructure. It provides a centralized inventory system, along with supporting services for notifications and real-time updates.
 
-![InfraInventory Screenshot](https://via.placeholder.com/800x400.png?text=InfraInventory+Dashboard)
+## System Architecture
 
-## ✨ Key Features
+The Infra-System suite is composed of three main components:
 
-*   **Comprehensive Inventory Management**: Track devices by hostname, IP, serial number, model, location, and status.
-*   **Interactive Rack View**: Visualize your server racks and manage device placement with an intuitive drag-and-drop interface.
-*   **User & Role Management**: Secure the system with multi-level user access (Admin, Editor, Viewer).
-*   **Encrypted Backups**: Create secure, password-protected (AES-256-CBC) backups of your entire database.
-*   **Data Import/Export**: Easily bulk-import your inventory from a CSV file and export your data when needed.
-*   **Audit Logging**: Keep a detailed log of all actions performed within the system for accountability and security.
-*   **Email Alerting**: Integrate with the `InfraGateway` microservice to send system alerts and test messages.
-*   **Modern Tech Stack**: Built with a reliable PHP backend, a dynamic React frontend, and styled with Tailwind CSS.
-*   **Responsive Design**: Access and manage your inventory from any device, with automatic light/dark mode support.
+### 1. Infra-Inventory
 
-## 🚀 Quick Start (Windows / Laragon)
+This is the core of the suite, providing a web-based IT asset management system. It allows users to track and manage hardware assets, including their physical location, rack position, and status.
 
-This guide will get you up and running using the recommended Laragon WAMP stack on Windows.
+**Key Features:**
+*   **Asset Management:** Full CRUD (Create, Read, Update, Delete) functionality for network devices, servers, and other hardware.
+*   **Rack Visualization:** An interactive, drag-and-drop interface to visualize and manage rack layouts.
+*   **Data Management:** Features for CSV import/export, database backup, and restoration.
+*   **User Roles:** Simple role-based access control (e.g., 'viewer' role).
+*   **Reporting:** Automated End-of-Support (EoS) reports.
 
-### 1. Environment Setup
+### 2. Infra-Gateway
 
-1.  Download and install **Laragon (Full version)**.
-2.  Launch Laragon and click **"Start All"** to run Apache and MySQL.
+A centralized and independent API-driven email gateway. Other applications within the suite can use this service to send emails and notifications. It requires API key authentication and logs all transactions.
 
-### 2. Deploy Files
+### 3. Infra-Websocket (Under Development)
 
-1.  Navigate to Laragon's web root directory (usually `C:\laragon\www`).
-2.  Create a new folder named `infra-inventory`.
-3.  Copy the project files (`index.html`, `api/` folder, etc.) into this new directory. Your file structure should look like this:
-    ```
-    C:\laragon\www\
-    └── infra-inventory\
-        ├── api\
-        ├── index.html
-        └── ...
-    ```
+This component is planned for introducing real-time features into the ecosystem. The primary goal is to provide live updates and notifications to the Infra-Inventory front-end, enhancing the user experience. The source directory for this component is currently empty.
 
-### 3. Configure Database
+## Technology Stack
 
-1.  Open the `infra-inventory/api/config.php` file in a text editor.
-2.  Verify the database credentials. For a default Laragon installation, you shouldn't need to change anything.
-    ```php
-    $host = 'localhost';
-    $db_name = 'infra_inventory';
-    $username = 'root';
-    $password = ''; // Default is an empty password
-    ```
-
-### 4. Initialize the Database
-
-1.  Open your web browser and navigate to the automated installation script:
-    **http://localhost/infra-inventory/api/setup_database.php**
-2.  Confirm the pre-filled settings and click the **"Connect & Install"** button.
-3.  You should see a "✅ Installation Successful!" message.
-
-> **Security Note**: After successful installation, it is highly recommended to delete or rename the `setup_database.php` file to prevent accidental resets.
-
-### 5. Log In
-
-1.  Navigate to the application's main page:
-    **http://localhost/infra-inventory/**
-2.  Log in with the default administrator credentials:
-    *   **Username:** `admin`
-    *   **Password:** `password123`
-
-## 📦 Version History
-
-### Version 2.0 - Rack View & Interactive Diagram
-*   **Interactive Rack View:** Visualize racks and drag-and-drop devices to update their position.
-*   **Bug Fixes:** Resolved issues with CDN links for the drag-and-drop library and improved device save logic.
-
-### Version 1.0 - Rack and Position Fields
-*   **Enhanced Tracking:** Added `rack` and `rack_position` fields to the database and API for more precise device location.
-*   **UI Updates:** The main table and device forms were updated to include the new rack and position fields.
-*   **CSV Import:** The CSV import format was updated to include the new fields.
-
-## 🔧 Tech Stack
-
-*   **Backend**: PHP 7.4+
-*   **Database**: MySQL / MariaDB
-*   **Frontend**: React, Tailwind CSS
-*   **Web Server**: Apache (or Nginx)
-
-## 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome! Feel free to check the issues page.
-
-## 📄 License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details.
-
+*   **Backend:** PHP
+*   **Database:** MariaDB (MySQL)
+*   **Web Server:** Apache
+*   **Frontend:** HTML, vanilla JavaScript, and CSS, with a JavaScript library for drag-and-drop functionality.
