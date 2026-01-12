@@ -1,210 +1,194 @@
-# InfraInventory on Linux: A Deployment White Paper
+# Infra-System on Linux: A Deployment Guide
 
-This document provides a comprehensive, step-by-step guide for deploying the InfraInventory suite on a new Linux server. The instructions are tailored for a Debian-based distribution such as Ubuntu 22.04 LTS.
+This document provides a comprehensive, step-by-step guide for deploying the Infra-System suite on a new Linux server. The instructions are tailored for a Debian-based distribution such as Ubuntu 22.04 LTS.
 
-## Part 1: Initial Server Setup & Security Hardening
+## 1. Prerequisites
 
-This section covers the essential first steps to secure your new server before installing any applications.
+### 1.1. Server Requirements
+- A fresh server running Ubuntu 22.04 LTS.
+- A user with `sudo` privileges.
+- A static IP address for your server.
 
-### 1.1. Connect to Your Server
+### 1.2. Initial Server Setup
+Connect to your server via SSH and perform the initial setup.
 
-First, connect to your server as the `root` user via SSH.
-
+**Update the system:**
 ```bash
-ssh root@YOUR_SERVER_IP
+sudo apt update && sudo apt upgrade -y
 ```
 
-### 1.2. System Update
-
-Ensure all system packages are up-to-date.
-
+**Set up the firewall:**
 ```bash
-apt update && apt upgrade -y
-```
-
-### 1.3. Create a Limited User Account
-
-Running services as `root` is a security risk. We will create a new user and grant it administrative privileges.
-
-```bash
-# Replace 'deployer' with your desired username
-adduser deployer
-
-# Add the new user to the 'sudo' group to grant admin rights
-usermod -aG sudo deployer
-```
-
-Now, log out of the `root` account and log back in as the new user.
-
-```bash
-exit
-ssh deployer@YOUR_SERVER_IP
-```
-
-All subsequent commands should be run as this new `deployer` user.
-
-### 1.4. Basic Firewall Configuration
-
-We will use `ufw` (Uncomplicated Firewall) to restrict traffic to only the services we need.
-
-```bash
-# Allow SSH connections (so you don't get locked out)
 sudo ufw allow OpenSSH
-
-# Allow HTTP and HTTPS traffic for the web server
 sudo ufw allow 'Apache Full'
-
-# Enable the firewall
 sudo ufw enable
 ```
 
-When prompted, type `y` and press Enter to proceed.
-
----
-
-## Part 2: Installing the LAMP Stack
-
-Next, we will install Apache (web server), MariaDB (database), and PHP (scripting language).
-
-### 2.1. Install Apache
+## 2. LAMP Stack Installation
+Install Apache, MariaDB, and PHP with the required modules.
 
 ```bash
-sudo apt install apache2 -y
+sudo apt install -y apache2 mariadb-server php libapache2-mod-php php-mysql php-curl php-json
 ```
 
-### 2.2. Install MariaDB
-
-MariaDB is a community-developed, open-source fork of MySQL and serves as a robust database server.
-
+Enable the Apache rewrite module:
 ```bash
-sudo apt install mariadb-server -y
+sudo a2enmod rewrite
+sudo systemctl restart apache2
 ```
 
-### 2.3. Secure MariaDB
+## 3. Database Setup
+Secure the MariaDB installation and create databases and users for the applications.
 
-Run the included security script to remove insecure defaults and lock down access.
-
+### 3.1. Secure MariaDB
+Run the security script and follow the prompts to set a root password and secure your installation.
 ```bash
 sudo mysql_secure_installation
 ```
 
-You will be asked a series of questions. For a new installation, answer them as follows:
-
-*   **Enter current password for root (enter for none):** Press **Enter**.
-*   **Switch to unix_socket authentication?** Press **n**.
-*   **Set root password?** Press **Y**, then enter and confirm a strong password for the database `root` user.
-*   **Remove anonymous users?** Press **Y**.
-*   **Disallow root login remotely?** Press **Y**.
-*   **Remove test database and access to it?** Press **Y**.
-*   **Reload privilege tables now?** Press **Y**.
-
-### 2.4. Install PHP and Required Modules
-
-Install PHP along with the modules necessary for Apache and MariaDB integration, and for the application to function correctly.
-
+### 3.2. Create Databases and Users
+Log in to the MariaDB shell:
 ```bash
-sudo apt install php libapache2-mod-php php-mysql php-json php-mbstring php-xml php-cli -y
+sudo mysql -u root -p
 ```
 
----
+Execute the following SQL commands, replacing `YourSecurePassword` with strong, unique passwords.
 
-## Part 3: Deploying the InfraInventory Application
-
-With the server stack in place, we can now deploy the application itself.
-
-### 3.1. Create the Database and User
-
-Log into the MariaDB shell using the root password you set earlier.
-
-```bash
-sudo mariadb -u root -p
-```
-
-Execute the following SQL commands to create the database and a dedicated user for the application. Replace `'YourSecurePassword'` with a strong, unique password.
-
+**For `infra-inventory`:**
 ```sql
-CREATE DATABASE infra_inventory;
-CREATE USER 'infra_user'@'localhost' IDENTIFIED BY 'YourSecurePassword';
+CREATE DATABASE infra_inventory CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'infra_user'@'localhost' IDENTIFIED BY 'YourSecurePassword1';
 GRANT ALL PRIVILEGES ON infra_inventory.* TO 'infra_user'@'localhost';
+```
+
+**For `infra-gateway`:**
+```sql
+CREATE DATABASE infra_gateway CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'gateway_user'@'localhost' IDENTIFIED BY 'YourSecurePassword2';
+GRANT ALL PRIVILEGES ON infra_gateway.* TO 'gateway_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
 
-### 3.2. Deploy Application Files
+## 4. Application Deployment
 
-Navigate to the Apache web root and clone the project repository.
-
+### 4.1. Clone the Repository
+Clone the project into the web server's root directory.
 ```bash
-cd /var/www/html
-
-# Remove the default Apache index page
-sudo rm index.html
-
-# Clone your project files here. If you have them in a git repo:
-# sudo git clone https://github.com/aihkleol-ship-it/infra-inventory-suite.git .
-# For this example, we'll assume you are copying files into /var/www/html/
-# Ensure the final structure is /var/www/html/index.html, /var/www/html/api/, etc.
+sudo git clone https://github.com/aihkleol-ship-it/infra-inventory-suite.git /var/www/infra-system
 ```
 
-> **Note:** The above assumes you are deploying to the default web root. For production, creating a dedicated Virtual Host is recommended.
-
-### 3.3. Set File Permissions
-
-The web server needs permission to read the files. We'll set the ownership to the `www-data` user, which is what Apache runs as.
-
+### 4.2. Set File Permissions
+Set the correct ownership and permissions for the application files.
 ```bash
-sudo chown -R www-data:www-data /var/www/html
-sudo chmod -R 755 /var/www/html
+sudo chown -R www-data:www-data /var/www/infra-system
+sudo chmod -R 755 /var/www/infra-system
 ```
 
-### 3.4. Configure the Application
+## 5. Configuration
 
-Edit the application's configuration file to use the database credentials you created.
-
+### 5.1. Central Database Configuration
+Create the central configuration file from the example.
 ```bash
-sudo nano /var/www/html/infra-inventory-suite/infra-inventoryapi/api/config.php
+sudo cp /var/www/infra-system/infra-system-config.php.example /var/www/infra-system/infra-system-config.php
 ```
-
-Modify the database connection variables to match the user and password from step 3.1.
-
+Edit the file and set the database credentials. For this guide, we'll use the `root` user for simplicity, but it's recommended to use the specific users created earlier.
+```bash
+sudo nano /var/www/infra-system/infra-system-config.php
+```
 ```php
-// api/config.php
-$host = 'localhost';
-$db_name = 'infra_inventory';
-$username = 'infra_user';
-$password = 'YourSecurePassword'; // Use the password you created
+<?php
+$host     = 'localhost';
+$username = 'root'; // Or 'infra_user' and 'gateway_user' respectively in each app's config
+$password = 'YourRootDBPassword'; 
 ```
 
-Press `CTRL+X`, then `Y`, then `Enter` to save and exit `nano`.
+**Note:** Since both applications now share this file, you can either use a single powerful user like `root` or create separate config files for each application if you want to use the dedicated database users. The current setup assumes a single user for simplicity of the central config file.
 
----
-
-## Part 4: Final Installation & Verification
-
-### 4.1. Run the Web Installer
-
-Open your web browser and navigate to the automated setup script using your server's IP address.
-
-**http://YOUR_SERVER_IP/infra-inventory-suite/infra-inventoryapi/api/setup_database.php**
-
-You should see a page with a "Connect & Install" button. Click it. Upon completion, a "✅ Installation Successful!" message will appear.
-
-### 4.2. 🔒 Critical Security Step
-
-Immediately after successful installation, **you must delete the setup script** to prevent unauthorized database resets.
+## 6. Web Server Configuration
+Create an Apache Virtual Host to serve the application.
 
 ```bash
-sudo rm /var/www/html/infra-inventory-suite/infra-inventoryapi/api/setup_database.php
+sudo nano /etc/apache2/sites-available/infra-system.conf
 ```
 
-### 4.3. Log In
+Paste the following configuration, replacing `your_server_ip` with your server's IP address. This will serve the `infra-inventory` as the main site.
 
-Navigate to your server's IP address in your browser.
+```apache
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    ServerName your_server_ip
+    DocumentRoot /var/www/infra-system/infra-inventory
 
-**http://YOUR_SERVER_IP/**
+    <Directory /var/www/infra-system/infra-inventory>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
 
-Log in with the default administrator credentials:
-*   **Username:** `admin`
-*   **Password:** `password123`
+    # Alias for the gateway admin panel
+    Alias /gateway /var/www/infra-system/infra-gateway
 
-Your InfraInventory instance is now successfully deployed and ready for use.
+    <Directory /var/www/infra-system/infra-gateway>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+```
+
+Enable the new site and restart Apache:
+```bash
+sudo a2ensite infra-system.conf
+sudo a2dissite 000-default.conf
+sudo systemctl restart apache2
+```
+
+## 7. Run Web Installers
+Run the setup scripts for both applications via your web browser.
+
+*   **`infra-inventory`**: Navigate to `http://your_server_ip/api/setup_database.php`
+*   **`infra-gateway`**: Navigate to `http://your_server_ip/gateway/api/setup.php`
+
+You should see success messages for both.
+
+## 8. Security Hardening
+
+### 8.1. Remove Setup Scripts
+This is a critical step to prevent unauthorized access and resets.
+```bash
+sudo rm /var/www/infra-system/infra-inventory/api/setup_database.php
+sudo rm /var/www/infra-system/infra-gateway/api/setup.php
+```
+
+### 8.2. Change Default Passwords
+Log in to both applications and change the default admin passwords immediately.
+- `infra-inventory` default: `admin` / `password123`
+- `infra-gateway` default: `admin` / `secret123`
+
+## 9. Cron Jobs
+Set up cron jobs for automated tasks. Open the crontab for the web server user:
+```bash
+sudo -u www-data crontab -e
+```
+
+Add the following lines to run the scripts daily at midnight:
+```
+# End-of-Support report for infra-inventory
+0 0 * * * /usr/bin/php /var/www/infra-system/infra-inventory/api/cron_eos_report.php
+
+# Zabbix synchronization for infra-inventory
+0 1 * * * /usr/bin/php /var/www/infra-system/infra-inventory/api/cron_zabbix_sync.php
+```
+
+## 10. Post-Installation
+Your Infra-System suite is now installed and ready to be configured.
+- Access `infra-inventory` at `http://your_server_ip/`
+- Access `infra-gateway` at `http://your_server_ip/gateway/`
+- Configure your SMTP and Zabbix settings in the `infra-gateway` admin panel.
+- Configure your `infra-inventory` settings, including the Gateway URL and API Key.
+
+Your system is now ready for use.

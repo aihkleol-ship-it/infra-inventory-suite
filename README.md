@@ -31,3 +31,26 @@ This component is planned for introducing real-time features into the ecosystem.
 *   **Database:** MariaDB (MySQL)
 *   **Web Server:** Apache
 *   **Frontend:** HTML, vanilla JavaScript, and CSS, with a JavaScript library for drag-and-drop functionality.
+
+## Database Schema
+
+The Infra-System suite uses two separate databases: `infra_inventory` and `infra_gateway`.
+
+### `infra_inventory` Database
+
+This database stores all the data for the main inventory management application.
+
+*   **`inventory`**: The core table containing all hardware assets and their details (hostname, IP, serial number, location, status, etc.).
+*   **`users`**: Stores user accounts and roles (`admin`, `editor`, `viewer`) for accessing the inventory system.
+*   **`system_settings`**: A key-value store for system-wide settings, such as the `infra-gateway` URL and API key.
+*   **`device_types`**, **`brands`**, **`models`**: Lookup tables for categorizing devices. Models are linked to brands and can have End-of-Support (EoS) dates.
+*   **`audit_logs`**: Records all actions performed by users within the system for accountability.
+
+### `infra_gateway` Database
+
+This database manages the operation of the centralized email and API gateway.
+
+*   **`gateway_settings`**: A key-value store for all gateway-related configurations, including SMTP server details, Zabbix API credentials, and cached Zabbix auth tokens.
+*   **`gateway_clients`**: Manages API clients and their unique keys, which are required to use the gateway's services.
+*   **`gateway_logs`**: A detailed log of every transaction that passes through the gateway, including email sending status and errors.
+*   **`gateway_users`**: Stores user accounts for the gateway's separate admin panel.
