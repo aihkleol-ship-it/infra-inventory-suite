@@ -34,6 +34,11 @@ if (empty($input['to']) || empty($input['body'])) {
 
 // 4. Send
 $mailer = new Mailer($pdo);
+
+if (isset($input['override_smtp']) && is_array($input['override_smtp'])) {
+    $mailer->overrideSettings($input['override_smtp']);
+}
+
 $result = $mailer->send($input['to'], $input['subject'] ?? 'No Subject', $input['body']);
 
 // 5. Log

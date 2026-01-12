@@ -22,6 +22,16 @@ class Mailer {
         $this->fromName  = $settings['smtp_from_name'];
     }
 
+    public function overrideSettings($settings) {
+        if (isset($settings['smtp_host'])) $this->host = $settings['smtp_host'];
+        if (isset($settings['smtp_port'])) $this->port = $settings['smtp_port'];
+        if (isset($settings['smtp_user'])) $this->user = $settings['smtp_user'];
+        if (isset($settings['smtp_pass'])) $this->pass = $settings['smtp_pass'];
+        if (isset($settings['smtp_encryption'])) $this->enc  = $settings['smtp_encryption'];
+        if (isset($settings['smtp_from_email'])) $this->fromEmail = $settings['smtp_from_email'];
+        if (isset($settings['smtp_from_name'])) $this->fromName  = $settings['smtp_from_name'];
+    }
+
     public function send($to, $subject, $htmlBody) {
         // (Copy the exact same send logic from the previous V5.1 Mailer.php here)
         // For brevity in this file block, I'll summarize the key lines, 

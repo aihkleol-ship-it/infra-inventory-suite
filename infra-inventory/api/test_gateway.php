@@ -27,19 +27,31 @@ try {
     }
 
     // 2. Compose Test Email
-    $subject = "[InfraInventory] Test Connection";
+    $test_case = $_GET['test_case'] ?? 'default';
+    $subject = "[InfraInventory] Test Connection (" . ucfirst($test_case) . ")";
     $body = "
     <div style='font-family: sans-serif; color: #333;'>
         <h2 style='color: #16a34a;'>✅ Connection Successful!</h2>
         <p>This is a test message from your InfraInventory instance.</p>
         <p>If you received this, your connection to the InfraGateway is working correctly.</p>
+        <p><strong>Test Case:</strong> " . ucfirst($test_case) . "</p>
         <hr style='border:none; border-top:1px solid #e5e7eb; margin:20px 0;'>
         <p style='color: #6b7280; font-size: 12px;'>Sent via InfraGateway</p>
     </div>";
 
     // 3. Send via Gateway (cURL)
     $ch = curl_init($gatewayUrl);
-    $payload = json_encode(["to" => $to, "subject" => $subject, "body" => $body]);
+    
+    $payload_data = ["to" => $to, "subject" => $subject, "body" => $body];
+
+    if ($test_case === 'no_encryption') {
+        $payload_data['override_smtp'] = [
+            'smtp_encryption' => 'none',
+            'smtp_port' => 25
+        ];
+    }
+
+    $payload = json_encode($payload_data);
     
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
