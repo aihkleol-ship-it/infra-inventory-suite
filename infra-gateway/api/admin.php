@@ -76,6 +76,11 @@ if ($method === 'GET') {
             "encryption" => $settings['smtp_encryption'] ?? 'tls',
             "from_email" => $settings['smtp_from_email'] ?? '',
             "from_name" => $settings['smtp_from_name'] ?? '',
+        ],
+        "zabbix" => [
+            "url" => $settings['zabbix_url'] ?? '',
+            "user" => $settings['zabbix_user'] ?? '',
+            "pass" => !empty($settings['zabbix_pass']) ? "******" : "",
         ]
     ]);
 } 
@@ -102,6 +107,20 @@ elseif ($method === 'POST') {
         ];
         if (!empty($input['pass']) && $input['pass'] !== '******') {
             $updates['smtp_pass'] = $input['pass'];
+        }
+        $stmt = $pdo->prepare("REPLACE INTO gateway_settings (setting_key, setting_value) VALUES (?, ?)");
+        foreach ($updates as $k => $v) $stmt->execute([$k, $v]);
+        echo json_encode(["success"=>true]);
+    }
+
+    // Zabbix Config
+    elseif ($input['action'] === 'save_zabbix') {
+        $updates = [
+            'zabbix_url' => $input['url'],
+            'zabbix_user' => $input['user'],
+        ];
+        if (!empty($input['pass']) && $input['pass'] !== '******') {
+            $updates['zabbix_pass'] = $input['pass'];
         }
         $stmt = $pdo->prepare("REPLACE INTO gateway_settings (setting_key, setting_value) VALUES (?, ?)");
         foreach ($updates as $k => $v) $stmt->execute([$k, $v]);
