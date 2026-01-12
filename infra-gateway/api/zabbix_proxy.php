@@ -1,7 +1,6 @@
 <?php
 // gateway/api/zabbix_proxy.php
 header("Content-Type: application/json");
-include_once 'Mailer.php'; // Using Mailer's DB connection logic for consistency
 
 // 1. Connect DB
 require_once __DIR__ . '/../../infra-system-config.php';
