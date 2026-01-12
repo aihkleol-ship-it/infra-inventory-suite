@@ -161,6 +161,10 @@ header('Content-Type: text/html; charset=utf-8');
                 ('SW-CORE-01', '192.168.1.1', 'FOC12345678', 2, 1, 1, 'HQ Server Room', 'Rack A1 - U40', 'A1', 'U40', 'Active'),
                 ('SRV-APP-01', '192.168.1.10', 'DEL12345678', 1, 2, 2, 'HQ Server Room', 'Rack B2 - U10', 'B2', 'U10', 'Active');
 
+                INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
+                ('gateway_url', ''),
+                ('gateway_key', '');
+
                 SET FOREIGN_KEY_CHECKS = 1;
 SQL;
                 
