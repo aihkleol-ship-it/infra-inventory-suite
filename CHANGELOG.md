@@ -1,5 +1,26 @@
 # Changelog
 
+## Version 3.0 - Zabbix Integration & System Improvements
+
+This version introduces a major new feature: integration with the Zabbix monitoring system. It also includes several improvements to the SMTP mailing system and logging capabilities.
+
+### ✨ New Features
+
+*   **Zabbix Integration:**
+    *   **Device Sync:** A new cron job script (`/infra-inventory/api/cron_zabbix_sync.php`) has been added to synchronize device information from Zabbix to the local inventory. Devices are mapped by serial number. The script updates the device's hostname and IP address based on the data from Zabbix.
+    *   **Zabbix Settings UI:** A new "Zabbix Config" page has been added to the `infra-gateway` admin panel to configure the Zabbix API URL and credentials.
+    *   **Secure API Proxy:** A new proxy endpoint (`/infra-gateway/api/zabbix_proxy.php`) has been created to handle all communication with the Zabbix API securely, without exposing credentials to other parts of the system.
+
+### 🐛 Bug Fixes & Improvements
+
+*   **SMTP Configuration:**
+    *   The SMTP settings page in the `infra-gateway` now explicitly supports "None" as an encryption method.
+    *   Added a testing mechanism to the `test_gateway.php` script to allow overriding SMTP settings for testing `tls`, `ssl`, and `none` encryption methods without changing the saved configuration.
+*   **Logging:**
+    *   The "Traffic Logs" view in the `infra-gateway` admin panel has been updated to display the detailed error message for failed email attempts, making it easier to debug SMTP connection issues.
+
+---
+
 ## Version 2.0 - Rack View & Interactive Diagram
 
 This update introduces a new interactive Rack View, allowing users to visualize and manage their rack layouts via drag-and-drop.
