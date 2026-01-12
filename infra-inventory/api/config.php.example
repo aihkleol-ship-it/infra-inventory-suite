@@ -8,9 +8,10 @@ ini_set('log_errors', 1);
 date_default_timezone_set('UTC');
 
 // --- Database Connection ---
-$host     = 'localhost';        // MariaDB/MySQL Host
-$username = 'infra_user';       // Database Username
-$password = 'your_strong_password'; // Database Password
+// Credentials are managed in the central file: /infra-system-config.php
+// Please create this file based on /infra-system-config.php.example
+require_once __DIR__ . '/../../infra-system-config.php';
+
 $db_name  = 'infra_inventory';  // Database Name
 
 // PDO Connection

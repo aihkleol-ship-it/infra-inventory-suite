@@ -4,8 +4,10 @@ header("Content-Type: application/json");
 include_once 'Mailer.php';
 
 // 1. Connect DB
+require_once __DIR__ . '/../../infra-system-config.php';
+$dbname = 'infra_gateway';
 try {
-    $pdo = new PDO("mysql:host=localhost;dbname=infra_gateway", "root", "");
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch(PDOException $e) {
     http_response_code(500); echo json_encode(["status"=>"error", "message"=>"Gateway DB Error"]); exit;

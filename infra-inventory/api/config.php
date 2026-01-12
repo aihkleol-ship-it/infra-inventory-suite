@@ -18,10 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 }
 
 // 3. Database Connection
-$host = 'localhost';
+require_once __DIR__ . '/../../infra-system-config.php';
 $db_name = 'infra_inventory';
-$username = 'root';
-$password = '';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$db_name", $username, $password);

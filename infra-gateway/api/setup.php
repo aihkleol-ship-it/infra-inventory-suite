@@ -1,9 +1,10 @@
 <?php
 // gateway/api/setup.php
-$host = 'localhost'; $user = 'root'; $pass = ''; $dbname = 'infra_gateway';
+require_once __DIR__ . '/../../infra-system-config.php';
+$dbname = 'infra_gateway';
 
 try {
-    $pdo = new PDO("mysql:host=$host", $user, $pass);
+    $pdo = new PDO("mysql:host=$host", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbname` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo->exec("USE `$dbname`");

@@ -1,0 +1,7 @@
+<?php
+// Central Database Configuration for Infra-System
+
+// --- Database Connection ---
+$host     = 'localhost';        // MariaDB/MySQL Host
+$username = 'root';       // Database Username
+$password = ''; // Database Password
