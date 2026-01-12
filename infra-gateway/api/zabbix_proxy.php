@@ -43,28 +43,28 @@ if (empty($input) || empty($input['method'])) {
 }
 
 // 5. Zabbix Authentication and Token Caching
-function getZabbixAuthToken($zabbix_url, $zabbix_user, $zabbix_pass) {
-    $token_cache_file = __DIR__ . '/zabbix_token.json';
+function getZabbixAuthToken($pdo, $settings) {
     $token_ttl = 3600; // 1 hour
 
-    if (file_exists($token_cache_file)) {
-        $cache = json_decode(file_get_contents($token_cache_file), true);
-        if (isset($cache['token']) && isset($cache['expires']) && time() < $cache['expires']) {
-            return $cache['token'];
-        }
+    $zabbix_token = $settings['zabbix_token'] ?? null;
+    $zabbix_token_expires = $settings['zabbix_token_expires'] ?? null;
+
+    if ($zabbix_token && $zabbix_token_expires && time() < $zabbix_token_expires) {
+        return $zabbix_token;
     }
 
+    // Token is invalid or expired, get a new one
     $auth_request = [
         'jsonrpc' => '2.0',
         'method' => 'user.login',
         'params' => [
-            'user' => $zabbix_user,
-            'password' => $zabbix_pass,
+            'user' => $settings['zabbix_user'],
+            'password' => $settings['zabbix_pass'],
         ],
         'id' => 1,
     ];
 
-    $ch = curl_init($zabbix_url);
+    $ch = curl_init($settings['zabbix_url']);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($auth_request));
@@ -75,10 +75,13 @@ function getZabbixAuthToken($zabbix_url, $zabbix_user, $zabbix_pass) {
     $decoded = json_decode($response, true);
     if (isset($decoded['result'])) {
         $token = $decoded['result'];
-        file_put_contents($token_cache_file, json_encode([
-            'token' => $token,
-            'expires' => time() + $token_ttl,
-        ]));
+        $expires = time() + $token_ttl;
+
+        // Save new token to database
+        $stmt = $pdo->prepare("REPLACE INTO gateway_settings (setting_key, setting_value) VALUES (?, ?)");
+        $stmt->execute(['zabbix_token', $token]);
+        $stmt->execute(['zabbix_token_expires', $expires]);
+
         return $token;
     } else {
         throw new Exception("Zabbix authentication failed: " . ($decoded['error']['data'] ?? 'Unknown error'));
@@ -89,7 +92,7 @@ function getZabbixAuthToken($zabbix_url, $zabbix_user, $zabbix_pass) {
 try {
     // If method is not user.login, add auth token to request
     if ($input['method'] !== 'user.login') {
-        $input['auth'] = getZabbixAuthToken($zabbix_url, $zabbix_user, $zabbix_pass);
+        $input['auth'] = getZabbixAuthToken($pdo, $settings);
     }
 
     $ch = curl_init($zabbix_url);

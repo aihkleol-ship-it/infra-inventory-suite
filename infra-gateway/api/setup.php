@@ -47,7 +47,8 @@ try {
     $defaults = [
         'smtp_host' => 'smtp.gmail.com', 'smtp_port' => '587', 'smtp_user' => '', 'smtp_pass' => '',
         'smtp_encryption' => 'tls', 'smtp_from_email' => 'gateway@local', 'smtp_from_name' => 'Gateway',
-        'zabbix_url' => '', 'zabbix_user' => '', 'zabbix_pass' => ''
+        'zabbix_url' => '', 'zabbix_user' => '', 'zabbix_pass' => '',
+        'zabbix_token' => '', 'zabbix_token_expires' => ''
     ];
     $stmt = $pdo->prepare("INSERT IGNORE INTO gateway_settings (setting_key, setting_value) VALUES (?, ?)");
     foreach ($defaults as $k => $v) $stmt->execute([$k, $v]);
