@@ -146,10 +146,21 @@
             );
         }
 
-        function ConfigView({ config, onRefresh }) {
+        function ConfigView({ config, onRefresh, onAuthError }) {
             const [form, setForm] = useState(config || {});
             useEffect(() => setForm(config || {}), [config]);
-            const save = (e) => { e.preventDefault(); axios.post('api/admin.php', {action: 'save_smtp', ...form}).then(() => { alert("Saved!"); onRefresh(); }).catch(e => alert(e.response?.data?.message)); };
+            const save = (e) => { 
+                e.preventDefault(); 
+                axios.post('api/admin.php', {action: 'save_smtp', ...form})
+                    .then(() => { alert("Saved!"); onRefresh(); })
+                    .catch(err => {
+                        if (err.response && err.response.status === 401) {
+                            onAuthError();
+                        } else {
+                            alert(err.response?.data?.message || "An error occurred.");
+                        }
+                    });
+            };
 
             return (
                 <div className="p-8 max-w-2xl mx-auto animate-fade-in">
@@ -176,10 +187,21 @@
             );
         }
 
-        function ZabbixView({ config, onRefresh }) {
+        function ZabbixView({ config, onRefresh, onAuthError }) {
             const [form, setForm] = useState(config || {});
             useEffect(() => setForm(config || {}), [config]);
-            const save = (e) => { e.preventDefault(); axios.post('api/admin.php', {action: 'save_zabbix', ...form}).then(() => { alert("Saved!"); onRefresh(); }).catch(e => alert(e.response?.data?.message)); };
+            const save = (e) => {
+                e.preventDefault();
+                axios.post('api/admin.php', {action: 'save_zabbix', ...form})
+                    .then(() => { alert("Saved!"); onRefresh(); })
+                    .catch(err => {
+                        if (err.response && err.response.status === 401) {
+                            onAuthError();
+                        } else {
+                            alert(err.response?.data?.message || "An error occurred.");
+                        }
+                    });
+            };
 
             return (
                 <div className="p-8 max-w-2xl mx-auto animate-fade-in">
@@ -215,11 +237,17 @@
             const [view, setView] = useState('clients');
             const [data, setData] = useState({ clients: [], logs: [], config: {}, admins: [], zabbix: {} });
 
+            const handleAuthError = () => {
+                setUser(null);
+            };
+
             const fetchData = () => {
                 axios.get('api/admin.php')
                     .then(res => setData(res.data))
                     .catch(err => {
-                        if(err.response && err.response.status === 401) setUser(null);
+                        if(err.response && err.response.status === 401) {
+                            handleAuthError();
+                        }
                     });
             };
 
@@ -257,8 +285,8 @@
                     <main className="flex-1 overflow-auto bg-slate-900 text-slate-200">
                         {view === 'clients' && <ClientsView clients={data.clients} onRefresh={fetchData} />}
                         {view === 'admins' && <UsersView admins={data.admins} currentUser={user} onRefresh={fetchData} />}
-                        {view === 'config' && <ConfigView config={data.config} onRefresh={fetchData} />}
-                        {view === 'zabbix' && <ZabbixView config={data.zabbix} onRefresh={fetchData} />}
+                        {view === 'config' && <ConfigView config={data.config} onRefresh={fetchData} onAuthError={handleAuthError} />}
+                        {view === 'zabbix' && <ZabbixView config={data.zabbix} onRefresh={fetchData} onAuthError={handleAuthError} />}
                         {view === 'logs' && <LogsView logs={data.logs} />}
                     </main>
                 </div>
