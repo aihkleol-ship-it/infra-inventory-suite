@@ -1,20 +1,22 @@
 <?php
 // api/config.php
 
-// 1. Start Session securely (Must be first)
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+if (php_sapi_name() !== 'cli') {
+    // 1. Start Session securely (Must be first)
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
 
-// 2. CORS Headers (Allow React to talk to PHP)
-header("Access-Control-Allow-Origin: *"); // For production, change * to your specific domain
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+    // 2. CORS Headers (Allow React to talk to PHP)
+    header("Access-Control-Allow-Origin: *"); // For production, change * to your specific domain
+    header("Content-Type: application/json; charset=UTF-8");
+    header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+    header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    http_response_code(200);
-    exit();
+    if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+        http_response_code(200);
+        exit();
+    }
 }
 
 // 3. Database Connection
