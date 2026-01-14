@@ -86,28 +86,21 @@ try {
             continue;
         }
 
-        $serial = $host['inventory']['serialno_a'];
+        $serial = trim($host['inventory']['serialno_a']);
         $zabbixHostname = $host['name'];
         $zabbixIp = $host['interfaces'][0]['ip'] ?? '';
 
-        // Find local device by serial number
-        $stmt = $pdo->prepare("SELECT id, hostname, ip_address FROM inventory WHERE serial_number = ?");
-        $stmt->execute([$serial]);
+        // Find local device by serial number (case-insensitive and trimmed)
+        $stmt = $pdo->prepare("SELECT id, hostname, ip_address FROM inventory WHERE TRIM(LOWER(serial_number)) = ?");
+        $stmt->execute([strtolower($serial)]);
         $localDevice = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($localDevice) {
-            // Device found, check if update is needed
-            if ($localDevice['hostname'] !== $zabbixHostname || $localDevice['ip_address'] !== $zabbixIp) {
-                $updateStmt = $pdo->prepare("UPDATE inventory SET hostname = ?, ip_address = ? WHERE id = ?");
-                $updateStmt->execute([$zabbixHostname, $zabbixIp, $localDevice['id']]);
-                
-                $logMsg = "Updated device #{$localDevice['id']} (SN: $serial). Hostname: '{$localDevice['hostname']}' -> '$zabbixHostname'. IP: '{$localDevice['ip_address']}' -> '$zabbixIp'.";
-                echo $logMsg . "\n";
-                writeLog($pdo, 'ZABBIX_SYNC', 'Device Updated', $logMsg);
-                $updatedCount++;
-            } else {
-                $skippedCount++;
-            }
+            // Device found, skip it
+            $logMsg = "Skipped device (SN: $serial) because it already exists.";
+            echo $logMsg . "\n";
+            writeLog($pdo, 'ZABBIX_SYNC', 'Device Skipped', $logMsg);
+            $skippedCount++;
         } else {
             // Device not found, check for duplicates by IP or hostname before creating
             $stmt = $pdo->prepare("SELECT id FROM inventory WHERE hostname = ? OR ip_address = ?");

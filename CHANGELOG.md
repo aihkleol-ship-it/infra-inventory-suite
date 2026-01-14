@@ -1,5 +1,30 @@
 # Changelog
 
+## Version 3.2 - Zabbix Sync Enhancement
+
+This version improves the reliability of the Zabbix synchronization process.
+
+### 🐛 Bug Fixes & Improvements
+
+*   **Zabbix Duplicate Prevention:**
+    *   The serial number check during Zabbix synchronization is now case-insensitive and ignores leading/trailing whitespace. This prevents the creation of duplicate devices when serial numbers differ only in case or have extra spaces.
+
+## Version 3.1 - Zabbix Integration Refinements
+
+This version refines the Zabbix integration by providing more control over the synchronization process and improving the user experience.
+
+### ✨ New Features
+
+*   **Manual Zabbix Sync:**
+    *   A "Sync Zabbix" button has been added to the "Inventory" page, allowing administrators to trigger the Zabbix synchronization process manually at any time.
+
+### 🐛 Bug Fixes & Improvements
+
+*   **Zabbix Integration:**
+    *   **Duplicate Prevention:** The Zabbix synchronization script (`/infra-inventory/api/cron_zabbix_sync.php`) has been updated to prevent duplicate devices more effectively. If a device with a matching serial number is found in the inventory, the script will now skip it instead of updating it. This gives administrators more control over which data is updated.
+
+---
+
 ## Version 3.0 - Zabbix Integration & System Improvements
 
 This version introduces a major new feature: integration with the Zabbix monitoring system. It also includes several improvements to the SMTP mailing system and logging capabilities.
