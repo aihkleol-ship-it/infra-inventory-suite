@@ -2,7 +2,11 @@
 
 ## Version 3.2 - Zabbix Sync Enhancement
 
-This version improves the reliability of the Zabbix synchronization process.
+This version improves the reliability and functionality of the Zabbix synchronization process.
+
+### ✨ New Features
+
+*   **Update Existing Devices:** The Zabbix sync script will now update the `hostname` and `ip_address` of existing devices if they have changed in Zabbix. Previously, existing devices were skipped.
 
 ### 🐛 Bug Fixes & Improvements
 
