@@ -56,7 +56,16 @@ try {
         return $decoded['result'];
     }
 
-    // 2. Get all hosts from Zabbix with serial number
+    // 2. Get default IDs for new devices
+    $defaultTypeId = $pdo->query("SELECT id FROM device_types WHERE name = 'Discovered'")->fetchColumn();
+    $defaultBrandId = $pdo->query("SELECT id FROM brands WHERE name = 'Zabbix'")->fetchColumn();
+    $defaultModelId = $pdo->query("SELECT id FROM models WHERE name = 'Zabbix Host' AND brand_id = $defaultBrandId")->fetchColumn();
+
+    if (!$defaultTypeId || !$defaultBrandId || !$defaultModelId) {
+        throw new Exception("Default categories for Zabbix import not found. Please run the setup script.");
+    }
+
+    // 3. Get all hosts from Zabbix with serial number
     echo "Fetching hosts from Zabbix...\n";
     $zabbixHosts = callZabbixApi('host.get', [
         'output' => ['host', 'name'],
@@ -67,9 +76,10 @@ try {
     
     echo "Found " . count($zabbixHosts) . " hosts with serial numbers in Zabbix.\n";
     $updatedCount = 0;
+    $createdCount = 0;
     $skippedCount = 0;
 
-    // 3. Iterate over Zabbix hosts and update local inventory
+    // 4. Iterate over Zabbix hosts and update local inventory
     foreach ($zabbixHosts as $host) {
         if (empty($host['inventory']['serialno_a'])) {
             $skippedCount++;
@@ -99,12 +109,33 @@ try {
                 $skippedCount++;
             }
         } else {
-            // Device not found in local inventory
-            $skippedCount++;
+            // Device not found, check for duplicates by IP or hostname before creating
+            $stmt = $pdo->prepare("SELECT id FROM inventory WHERE hostname = ? OR ip_address = ?");
+            $stmt->execute([$zabbixHostname, $zabbixIp]);
+            if ($stmt->fetch()) {
+                $logMsg = "Skipped creating device (SN: $serial). Duplicate hostname '$zabbixHostname' or IP '$zabbixIp' already exists.";
+                echo $logMsg . "\n";
+                writeLog($pdo, 'ZABBIX_SYNC', 'Skipped Duplicate', $logMsg);
+                $skippedCount++;
+                continue;
+            }
+
+            // Create new device
+            $insertStmt = $pdo->prepare(
+                "INSERT INTO inventory (hostname, ip_address, serial_number, type_id, brand_id, model_id, status, location) 
+                 VALUES (?, ?, ?, ?, ?, ?, 'Active', 'Discovered by Zabbix')"
+            );
+            $insertStmt->execute([$zabbixHostname, $zabbixIp, $serial, $defaultTypeId, $defaultBrandId, $defaultModelId]);
+            $newId = $pdo->lastInsertId();
+
+            $logMsg = "Created new device #{$newId} from Zabbix (SN: $serial, Host: $zabbixHostname, IP: $zabbixIp).";
+            echo $logMsg . "\n";
+            writeLog($pdo, 'ZABBIX_SYNC', 'Device Created', $logMsg);
+            $createdCount++;
         }
     }
 
-    $summary = "Sync complete. Updated: $updatedCount devices. Skipped/Unchanged: $skippedCount devices.";
+    $summary = "Sync complete. Updated: $updatedCount, Created: $createdCount, Skipped/Unchanged: $skippedCount.";
     echo $summary . "\n";
     writeLog($pdo, 'ZABBIX_SYNC', 'Sync Finished', $summary);
 

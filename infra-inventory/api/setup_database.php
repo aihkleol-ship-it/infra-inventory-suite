@@ -149,13 +149,14 @@ header('Content-Type: text/html; charset=utf-8');
                 ('admin', '$pHash', 'admin'),
                 ('viewer', '$pHash', 'viewer');
 
-                INSERT INTO `device_types` (`name`) VALUES ('Server'), ('Switch'), ('Router'), ('Firewall'), ('Storage'), ('PDU');
-                INSERT INTO `brands` (`name`) VALUES ('Cisco'), ('Dell'), ('HP'), ('Fortinet'), ('Synology');
+                INSERT INTO `device_types` (`name`) VALUES ('Server'), ('Switch'), ('Router'), ('Firewall'), ('Storage'), ('PDU'), ('Discovered');
+                INSERT INTO `brands` (`name`) VALUES ('Cisco'), ('Dell'), ('HP'), ('Fortinet'), ('Synology'), ('Zabbix');
                 
                 INSERT INTO `models` (`brand_id`, `name`, `eos_date`) VALUES 
                 (1, 'Catalyst 9300', '2030-01-01'), 
                 (2, 'PowerEdge R740', '2027-12-31'), 
-                (4, 'FortiGate 100F', '2028-11-30');
+                (4, 'FortiGate 100F', '2028-11-30'),
+                (6, 'Zabbix Host', NULL);
 
                 INSERT INTO `inventory` (`hostname`, `ip_address`, `serial_number`, `type_id`, `brand_id`, `model_id`, `location`, `sub_location`, `rack`, `rack_position`, `status`) VALUES 
                 ('SW-CORE-01', '192.168.1.1', 'FOC12345678', 2, 1, 1, 'HQ Server Room', 'Rack A1 - U40', 'A1', 'U40', 'Active'),
