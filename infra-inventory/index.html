@@ -163,9 +163,24 @@
 
         // --- INVENTORY VIEW ---
         function InventoryView({ inventory, user, fetchData, onImportOpen, onEdit, onDelete, riskFilter, setRiskFilter }) {
+            const toast = useToast();
             const [searchTerm, setSearchTerm] = useState("");
             const [locationFilter, setLocationFilter] = useState("");
             const [sortConfig, setSortConfig] = useState({ key: 'hostname', direction: 'ascending' });
+            
+            const handleSyncZabbix = () => {
+                toast("Zabbix sync started in the background...", 'info');
+                axios.get('api/trigger_zabbix_sync.php')
+                    .then(res => {
+                        if (res.data.status === 'success') {
+                            toast(res.data.message, 'success');
+                        } else {
+                            toast(res.data.message, 'error');
+                        }
+                    })
+                    .catch(err => toast("Sync trigger failed: " + (err.response?.data?.message || err.message), 'error'));
+            };
+
             const processedInventory = useMemo(() => {
                 let items = [...inventory];
                 if (riskFilter) { items = items.filter(i => { const meta = getEOSMeta(i.eos_date); return meta.isRisk && i.status !== 'Decommissioned'; }); }
@@ -181,6 +196,7 @@
                     <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-6 shrink-0 gap-4">
                         <div><h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Inventory List</h2><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Complete database of all tracked assets.</p></div>
                         <div className="flex gap-2">
+                            <button onClick={handleSyncZabbix} className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-900 text-purple-600 dark:text-purple-400 px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 text-sm font-bold hover:border-purple-300 dark:hover:border-purple-700 hover:text-purple-700 dark:hover:text-purple-300 transition-all"><i className="ph ph-plugs text-lg"></i> Sync Zabbix</button>
                             <a href="api/export.php" target="_blank" className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 text-sm font-bold hover:border-brand-200 dark:hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 transition-all"><i className="ph ph-download-simple text-lg"></i> Export</a>
                             {user.role !== 'viewer' && (<><button onClick={onImportOpen} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 text-sm font-bold hover:border-brand-200 dark:hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 transition-all"><i className="ph ph-upload-simple text-lg"></i> Import</button><button onClick={() => onEdit(null)} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-brand-200 dark:shadow-none flex items-center gap-2 text-sm font-bold hover:bg-brand-700 transition-all transform hover:-translate-y-0.5"><i className="ph ph-plus text-lg"></i> Add Device</button></>)}
                         </div>
