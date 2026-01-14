@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 3.2.2 - Zabbix Sync Hotfix
+
+This version fixes a critical bug in the Zabbix synchronization script that caused a SQL error on MariaDB systems.
+
+### 🐛 Bug Fixes & Improvements
+
+*   **MariaDB Compatibility:** Refactored the Zabbix sync script to avoid using complex SQL functions (`TRIM`, `LOWER`) in `WHERE` clauses. The script now performs the necessary data cleaning and comparison in PHP to prevent SQL syntax errors on MariaDB.
+
 ## Version 3.2 - Zabbix Sync Enhancement
 
 This version improves the reliability and functionality of the Zabbix synchronization process.
