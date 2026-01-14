@@ -111,37 +111,37 @@ try {
         $zabbixIp = $host['interfaces'][0]['ip'] ?? '';
 
         // Find local device in the map
-        $localDevice = $deviceMap[$serial] ?? null;
+        // $localDevice = $deviceMap[$serial] ?? null;
 
-        if ($localDevice) {
-            // Device found, update it if necessary
-            if ($localDevice['hostname'] !== $zabbixHostname || $localDevice['ip_address'] !== $zabbixIp) {
-                $updateStmt = $pdo->prepare(
-                    "UPDATE inventory SET hostname = ?, ip_address = ? WHERE id = ?"
-                );
-                $updateStmt->execute([$zabbixHostname, $zabbixIp, $localDevice['id']]);
+        // if ($localDevice) {
+        //     // Device found, update it if necessary
+        //     if ($localDevice['hostname'] !== $zabbixHostname || $localDevice['ip_address'] !== $zabbixIp) {
+        //         $updateStmt = $pdo->prepare(
+        //             "UPDATE inventory SET hostname = ?, ip_address = ? WHERE id = ?"
+        //         );
+        //         $updateStmt->execute([$zabbixHostname, $zabbixIp, $localDevice['id']]);
 
-                $logMsg = "Updated device #{$localDevice['id']} from Zabbix (SN: {$host['inventory']['serialno_a']}, Host: $zabbixHostname, IP: $zabbixIp).";
-                echo $logMsg . "\n";
-                writeLog($pdo, 'ZABBIX_SYNC', 'Device Updated', $logMsg);
-                $updatedCount++;
-            } else {
-                $logMsg = "Skipped device (SN: {$host['inventory']['serialno_a']}) as it is already up-to-date.";
-                echo $logMsg . "\n";
-                writeLog($pdo, 'ZABBIX_SYNC', 'Device Skipped', $logMsg);
-                $skippedCount++;
-            }
-        } else {
+        //         $logMsg = "Updated device #{$localDevice['id']} from Zabbix (SN: {$host['inventory']['serialno_a']}, Host: $zabbixHostname, IP: $zabbixIp).";
+        //         echo $logMsg . "\n";
+        //         writeLog($pdo, 'ZABBIX_SYNC', 'Device Updated', $logMsg);
+        //         $updatedCount++;
+        //     } else {
+        //         $logMsg = "Skipped device (SN: {$host['inventory']['serialno_a']}) as it is already up-to-date.";
+        //         echo $logMsg . "\n";
+        //         writeLog($pdo, 'ZABBIX_SYNC', 'Device Skipped', $logMsg);
+        //         $skippedCount++;
+        //     }
+        // } else {
             // Device not found, check for duplicates by IP or hostname before creating
-            $stmt = $pdo->prepare("SELECT id FROM inventory WHERE hostname = ? OR ip_address = ?");
-            $stmt->execute([$zabbixHostname, $zabbixIp]);
-            if ($stmt->fetch()) {
-                $logMsg = "Skipped creating device (SN: {$host['inventory']['serialno_a']}). Duplicate hostname '$zabbixHostname' or IP '$zabbixIp' already exists.";
-                echo $logMsg . "\n";
-                writeLog($pdo, 'ZABBIX_SYNC', 'Skipped Duplicate', $logMsg);
-                $skippedCount++;
-                continue;
-            }
+            // $stmt = $pdo->prepare("SELECT id FROM inventory WHERE hostname = ? OR ip_address = ?");
+            // $stmt->execute([$zabbixHostname, $zabbixIp]);
+            // if ($stmt->fetch()) {
+            //     $logMsg = "Skipped creating device (SN: {$host['inventory']['serialno_a']}). Duplicate hostname '$zabbixHostname' or IP '$zabbixIp' already exists.";
+            //     echo $logMsg . "\n";
+            //     writeLog($pdo, 'ZABBIX_SYNC', 'Skipped Duplicate', $logMsg);
+            //     $skippedCount++;
+            //     continue;
+            // }
 
             // Create new device
             $insertStmt = $pdo->prepare(
@@ -155,7 +155,7 @@ try {
             echo $logMsg . "\n";
             writeLog($pdo, 'ZABBIX_SYNC', 'Device Created', $logMsg);
             $createdCount++;
-        }
+        // }
     }
 
     $summary = "Sync complete. Updated: $updatedCount, Created: $createdCount, Skipped/Unchanged: $skippedCount.";
