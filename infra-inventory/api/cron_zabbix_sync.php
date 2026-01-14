@@ -61,7 +61,10 @@ try {
     // 2. Get default IDs for new devices
     $defaultTypeId = $pdo->query("SELECT id FROM device_types WHERE name = 'Discovered'")->fetchColumn();
     $defaultBrandId = $pdo->query("SELECT id FROM brands WHERE name = 'Zabbix'")->fetchColumn();
-    $defaultModelId = $pdo->query("SELECT id FROM models WHERE name = 'Zabbix Host' AND brand_id = $defaultBrandId")->fetchColumn();
+    
+    $modelStmt = $pdo->prepare("SELECT id FROM models WHERE name = 'Zabbix Host' AND brand_id = ?");
+    $modelStmt->execute([$defaultBrandId]);
+    $defaultModelId = $modelStmt->fetchColumn();
 
     if (!$defaultTypeId || !$defaultBrandId || !$defaultModelId) {
         throw new Exception("Default categories for Zabbix import not found. Please run the setup script.");

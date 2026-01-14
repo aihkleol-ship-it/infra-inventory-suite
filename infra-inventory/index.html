@@ -169,21 +169,16 @@
             const [sortConfig, setSortConfig] = useState({ key: 'hostname', direction: 'ascending' });
             
             const handleSyncZabbix = () => {
-                console.log("handleSyncZabbix function called");
                 toast("Zabbix sync started in the background...", 'info');
                 axios.get('api/trigger_zabbix_sync.php')
                     .then(res => {
-                        console.log("Zabbix sync response:", res.data);
                         if (res.data.status === 'success') {
                             toast(res.data.message, 'success');
                         } else {
                             toast(res.data.message, 'error');
                         }
                     })
-                    .catch(err => {
-                        console.error("Zabbix sync error:", err);
-                        toast("Sync trigger failed: " + (err.response?.data?.message || err.message), 'error');
-                    });
+                    .catch(err => toast("Sync trigger failed: " + (err.response?.data?.message || err.message), 'error'));
             };
 
             const processedInventory = useMemo(() => {
