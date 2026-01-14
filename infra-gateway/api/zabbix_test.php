@@ -35,7 +35,7 @@ try {
         'jsonrpc' => '2.0',
         'method' => 'user.login',
         'params' => [
-            'user' => $zabbix_user,
+            'username' => $zabbix_user,
             'password' => $zabbix_pass,
         ],
         'id' => 1,

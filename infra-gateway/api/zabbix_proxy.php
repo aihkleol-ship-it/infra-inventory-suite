@@ -58,7 +58,7 @@ function getZabbixAuthToken($pdo, $settings) {
         'jsonrpc' => '2.0',
         'method' => 'user.login',
         'params' => [
-            'user' => $settings['zabbix_user'],
+            'username' => $settings['zabbix_user'],
             'password' => $settings['zabbix_pass'],
         ],
         'id' => 1,
