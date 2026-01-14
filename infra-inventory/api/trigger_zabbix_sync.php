@@ -3,6 +3,8 @@
 include_once 'config.php';
 include_once 'logger.php'; // Include logger
 
+set_time_limit(300); // 5 minutes
+
 if (php_sapi_name() !== 'cli' && (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin')) {
     http_response_code(403);
     echo json_encode(["status" => "error", "message" => "Unauthorized access."]);
