@@ -78,9 +78,8 @@ function getZabbixAuthToken($pdo, $settings) {
         $expires = time() + $token_ttl;
 
         // Save new token to database
-        $stmt = $pdo->prepare("REPLACE INTO gateway_settings (setting_key, setting_value) VALUES (?, ?)");
-        $stmt->execute(['zabbix_token', $token]);
-        $stmt->execute(['zabbix_token_expires', $expires]);
+        $stmt = $pdo->prepare("REPLACE INTO gateway_settings (setting_key, setting_value) VALUES (?, ?), (?, ?)");
+        $stmt->execute(['zabbix_token', $token, 'zabbix_token_expires', $expires]);
 
         return $token;
     } else {
