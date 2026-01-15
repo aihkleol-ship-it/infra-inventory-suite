@@ -173,6 +173,7 @@ try {
         }
     }
 
+    /*
     // 6. Handle devices that are in the inventory but not in Zabbix anymore
     $decommissionedCount = 0;
     foreach ($deviceMap as $serial => $device) {
@@ -189,6 +190,8 @@ try {
             $decommissionedCount++;
         }
     }
+    */
+    $decommissionedCount = 0; // Keep the variable for the summary log
 
     $summary = "Sync complete. Updated: $updatedCount, Created: $createdCount, Skipped/Unchanged: $skippedCount, Decommissioned: $decommissionedCount.";
     echo $summary . "\n";
