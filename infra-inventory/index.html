@@ -162,7 +162,7 @@
         }
 
         // --- INVENTORY VIEW ---
-        function InventoryView({ inventory, user, fetchData, onImportOpen, onEdit, onDelete, riskFilter, setRiskFilter }) {
+        function InventoryView({ inventory, user, fetchData, onImportOpen, onEdit, onDelete, riskFilter, setRiskFilter, setRawOutput, setIsRawOutputModalOpen }) {
             const toast = useToast();
             const [searchTerm, setSearchTerm] = useState("");
             const [locationFilter, setLocationFilter] = useState("");
@@ -170,7 +170,7 @@
             
             const handleSyncZabbix = () => {
                 console.log("handleSyncZabbix called via button click");
-                toast("Zabbix sync started in the background...", 'info');
+                toast("Zabbix sync started...", 'info');
                 axios.get('api/trigger_zabbix_sync.php')
                     .then(res => {
                         if (res.data.status === 'success') {
@@ -178,6 +178,8 @@
                         } else {
                             toast(res.data.message, 'error');
                         }
+                        setRawOutput(res.data.output);
+                        setIsRawOutputModalOpen(true);
                     })
                     .catch(err => toast("Sync trigger failed: " + (err.response?.data?.message || err.message), 'error'));
             };
@@ -541,6 +543,30 @@
             return (<div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"><div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md p-6"><div className="flex justify-between mb-6"><h2 className="font-bold text-lg text-slate-800 dark:text-white">Import CSV</h2><button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button></div><div className="mb-6 text-sm bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 p-4 rounded-xl border border-blue-100 dark:border-blue-800 flex items-center justify-between"><span>Get the correct CSV format</span><button onClick={downloadTemplate} className="text-xs bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-700 px-3 py-1.5 rounded-lg font-bold hover:shadow-sm dark:text-blue-200">Download</button></div>{!result ? <form onSubmit={handleUpload} className="space-y-4"><input type="file" onChange={e=>setFile(e.target.files[0])} className="w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-50 dark:file:bg-brand-900/30 file:text-brand-700 dark:file:text-brand-300 hover:file:bg-brand-100" /><button disabled={uploading} className="w-full bg-slate-900 dark:bg-slate-700 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-all">{uploading?"Uploading...":"Start Import"}</button></form> : <div><div className={`p-4 rounded-xl mb-4 text-sm font-medium ${result.success?'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300':'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>{result.message}</div><button onClick={()=>{onClose();setResult(null)}} className="w-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-3 rounded-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-700">Close</button></div>}</div></div>);
         }
 
+        function RawOutputModal({ isOpen, onClose, output }) {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white">Zabbix Sync Raw Output</h2>
+                            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl">✕</button>
+                        </div>
+                        <div className="p-8 overflow-y-auto">
+                            <pre className="text-xs bg-slate-50 dark:bg-slate-800 p-4 rounded-lg text-slate-600 dark:text-slate-300 whitespace-pre-wrap">
+                                {output}
+                            </pre>
+                        </div>
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                            <button onClick={onClose} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-300 dark:hover:bg-slate-600">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         function App() {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('dashboard');
@@ -555,6 +581,8 @@
             const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
             const [editingDevice, setEditingDevice] = useState(null);
             const [riskFilter, setRiskFilter] = useState(false);
+            const [isRawOutputModalOpen, setIsRawOutputModalOpen] = useState(false);
+            const [rawOutput, setRawOutput] = useState("");
 
             useEffect(() => { if (user) fetchData(); }, [user]);
 
@@ -621,13 +649,14 @@
                 <ToastProvider>
                     <Layout user={user} currentView={view} onViewChange={handleViewChange} onLogout={handleLogout}>
                         {view === 'dashboard' && <DashboardView inventory={inventory} onNavigateToRisks={()=>{ setRiskFilter(true); setView('inventory'); }} />}
-                        {view === 'inventory' && <InventoryView {...dataProps} />}
+                        {view === 'inventory' && <InventoryView {...dataProps} setRawOutput={setRawOutput} setIsRawOutputModalOpen={setIsRawOutputModalOpen} />}
                         {view === 'rack' && <RackView inventory={inventory} onDeviceMove={handleDeviceMove} />}
                         {view === 'settings' && <SettingsView options={options} onDataUpdated={fetchData} currentUser={user} />}
                         {view === 'logs' && <LogsView />}
 
                         {isDeviceModalOpen && <DeviceModal isOpen={true} onClose={()=>{setIsDeviceModalOpen(false); setEditingDevice(null);}} onSave={(fd)=>{ const p = editingDevice ? {...fd, id:editingDevice.id} : fd; handleSaveDevice(p); }} options={options} initialData={editingDevice} />}
                         {isImportOpen && <ImportModal onClose={()=>setIsImportOpen(false)} onDataUpdated={fetchData} />}
+                        {isRawOutputModalOpen && <RawOutputModal isOpen={true} onClose={() => setIsRawOutputModalOpen(false)} output={rawOutput} />}
                     </Layout>
                 </ToastProvider>
             );
