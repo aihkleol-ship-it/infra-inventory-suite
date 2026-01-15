@@ -24,7 +24,7 @@ function getId($pdo, $table, $field, $value, $extra = []) {
     return $pdo->lastInsertId();
 }
 
-$rowNum = 0; $success = 0; $errors = [];
+$rowNum = 0; $success_add = 0; $success_update = 0; $errors = [];
 
 try {
     $pdo->beginTransaction();
@@ -36,31 +36,75 @@ try {
         }
         if (empty($data[0]) && empty($data[2])) continue;
 
-        // V6.0 CSV Structure: 
-        // 0:Host, 1:IP, 2:Serial, 3:Type, 4:Brand, 5:Model, 6:Location, 7:Rack, 8:RackPosition, 9:Status
+        // New V6.1 CSV Structure (matches export):
+        // 0:Hostname, 1:IP, 2:Serial, 3:Type, 4:Brand, 5:Model, 6:EOS, 7:Location, 8:Sub Location, 9:Rack, 10:Rack Position, 11:Status, 12:Asset ID, 13:Firmware, 14:Notes
         
-        $hostname = $data[0] ?? null;
-        $serial   = $data[2] ?? null;
+        $hostname       = $data[0] ?? null;
+        $ip_address     = $data[1] ?? null;
+        $serial         = $data[2] ?? null;
         if (!$hostname || !$serial) { $errors[] = "Row $rowNum: Hostname/Serial required."; continue; }
 
-        $typeId = getId($pdo, 'device_types', 'name', !empty($data[3]) ? $data[3] : 'Server');
-        $brandId = getId($pdo, 'brands', 'name', !empty($data[4]) ? $data[4] : 'Generic');
-        $modelId = getId($pdo, 'models', 'name', !empty($data[5]) ? $data[5] : 'Generic Model', ['brand_id' => $brandId]);
+        $typeId         = getId($pdo, 'device_types', 'name', !empty($data[3]) ? $data[3] : 'Server');
+        $brandId        = getId($pdo, 'brands', 'name', !empty($data[4]) ? $data[4] : 'Generic');
+        $modelId        = getId($pdo, 'models', 'name', !empty($data[5]) ? $data[5] : 'Generic Model', ['brand_id' => $brandId]);
+        
+        $eos_date       = !empty($data[6]) ? date('Y-m-d', strtotime($data[6])) : null;
+        $location       = $data[7] ?? null;
+        $sub_location   = $data[8] ?? null;
+        $rack           = $data[9] ?? null;
+        $rack_position  = $data[10] ?? null;
+        $status         = $data[11] ?? 'Active';
+        $asset_id       = $data[12] ?? null;
+        $firmware       = $data[13] ?? null;
+        $notes          = $data[14] ?? null;
+
+        // Check if serial number exists
+        $stmt = $pdo->prepare("SELECT id FROM inventory WHERE serial_number = ?");
+        $stmt->execute([$serial]);
+        $existingId = $stmt->fetchColumn();
 
         try {
-            $stmt = $pdo->prepare("INSERT INTO inventory (hostname, ip_address, serial_number, type_id, brand_id, model_id, location, rack, rack_position, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([
-                $hostname, $data[1] ?? null, $serial, $typeId, $brandId, $modelId, 
-                $data[6] ?? null, // Location
-                $data[7] ?? null, // Rack
-                $data[8] ?? null, // Rack Position
-                $data[9] ?? 'Active'
-            ]);
-            $success++;
-        } catch (PDOException $e) { $errors[] = $e->getCode() == 23000 ? "Row $rowNum: Duplicate Serial." : "Row $rowNum Error: " . $e->getMessage(); }
+            if ($existingId) {
+                // Update existing record
+                $updateStmt = $pdo->prepare(
+                    "UPDATE inventory SET hostname = ?, ip_address = ?, type_id = ?, brand_id = ?, model_id = ?, 
+                     location = ?, sub_location = ?, rack = ?, rack_position = ?, status = ?, asset_id = ?, 
+                     firmware_version = ?, notes = ? WHERE id = ?"
+                );
+                $updateStmt->execute([
+                    $hostname, $ip_address, $typeId, $brandId, $modelId, $location, $sub_location,
+                    $rack, $rack_position, $status, $asset_id, $firmware, $notes, $existingId
+                ]);
+                // Also update EOS date on model
+                if ($eos_date && $modelId) {
+                    $pdo->prepare("UPDATE models SET eos_date = ? WHERE id = ?")->execute([$eos_date, $modelId]);
+                }
+                $success_update++;
+            } else {
+                // Insert new record
+                $insertStmt = $pdo->prepare(
+                    "INSERT INTO inventory (hostname, ip_address, serial_number, type_id, brand_id, model_id, 
+                     location, sub_location, rack, rack_position, status, asset_id, firmware_version, notes) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                );
+                $insertStmt->execute([
+                    $hostname, $ip_address, $serial, $typeId, $brandId, $modelId, $location, $sub_location,
+                    $rack, $rack_position, $status, $asset_id, $firmware, $notes
+                ]);
+                $newId = $pdo->lastInsertId();
+                // Also update EOS date on model
+                if ($eos_date && $modelId) {
+                    $pdo->prepare("UPDATE models SET eos_date = ? WHERE id = ?")->execute([$eos_date, $modelId]);
+                }
+                $success_add++;
+            }
+        } catch (PDOException $e) {
+            $errors[] = "Row $rowNum (Serial: $serial): " . $e->getMessage();
+        }
     }
     $pdo->commit(); fclose($handle);
-    echo json_encode(["success" => true, "imported" => $success, "errors" => $errors, "message" => "Imported $success items." . (count($errors)>0?" (".count($errors)." errors)":"")]);
+    $message = "Import complete. Added: $success_add, Updated: $success_update." . (count($errors) > 0 ? " Errors: " . count($errors) : "");
+    echo json_encode(["success" => true, "imported" => $success_add + $success_update, "errors" => $errors, "message" => $message]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     http_response_code(500); echo json_encode(["message" => "Import Error: " . $e->getMessage()]);

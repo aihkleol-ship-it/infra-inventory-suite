@@ -8,7 +8,7 @@ header('Content-Disposition: attachment; filename=inventory_export_' . date('Y-m
 
 $output = fopen('php://output', 'w');
 // Updated Headers
-fputcsv($output, ['Hostname', 'IP Address', 'Serial Number', 'Type', 'Brand', 'Model', 'EOS Date', 'Location', 'Sub Location', 'Status', 'Asset ID', 'Firmware', 'Notes']);
+fputcsv($output, ['Hostname', 'IP Address', 'Serial Number', 'Type', 'Brand', 'Model', 'EOS Date', 'Location', 'Sub Location', 'Rack', 'Rack Position', 'Status', 'Asset ID', 'Firmware', 'Notes']);
 
 $sql = "SELECT 
             i.hostname, 
@@ -20,6 +20,8 @@ $sql = "SELECT
             m.eos_date, 
             i.location, 
             i.sub_location,
+            i.rack,
+            i.rack_position,
             i.status, 
             i.asset_id, 
             i.firmware_version, 
