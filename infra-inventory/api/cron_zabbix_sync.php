@@ -23,7 +23,7 @@ try {
         throw new Exception("InfraGateway not configured in inventory settings.");
     }
     
-    $zabbixProxyUrl = rtrim($gatewayUrl, '/') . '/../infra-gateway/api/zabbix_proxy.php';
+    $zabbixProxyUrl = str_replace('send.php', 'zabbix_proxy.php', $gatewayUrl);
 
     // Helper function to make requests to the proxy
     function callZabbixApi($method, $params) {
