@@ -23,18 +23,22 @@ try {
     if (empty($zabbixUrl) || empty($zabbixUser) || empty($zabbixPass)) {
         throw new Exception("Zabbix API not configured in inventory settings.");
     }
+    
+    writeLog($pdo, 'ZABBIX_SYNC', 'Zabbix URL', $zabbixUrl);
 
     $zabbixAuthToken = null;
 
     function callZabbixApi($method, $params) {
-        global $zabbixUrl, $zabbixUser, $zabbixPass, $zabbixAuthToken;
+        global $zabbixUrl, $zabbixUser, $zabbixPass, $zabbixAuthToken, $pdo;
 
         if ($zabbixAuthToken === null && $method !== 'user.login') {
             $login_params = [
                 'username' => $zabbixUser,
                 'password' => $zabbixPass,
             ];
+            writeLog($pdo, 'ZABBIX_SYNC', 'API Login Request', json_encode($login_params));
             $zabbixAuthToken = callZabbixApi('user.login', $login_params);
+            writeLog($pdo, 'ZABBIX_SYNC', 'API Login Response', json_encode($zabbixAuthToken));
         }
 
         $request = [
@@ -47,6 +51,8 @@ try {
         if ($method !== 'user.login') {
             $request['auth'] = $zabbixAuthToken;
         }
+
+        writeLog($pdo, 'ZABBIX_SYNC', 'API Request', json_encode($request));
 
         $ch = curl_init($zabbixUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -61,6 +67,8 @@ try {
             throw new Exception("Zabbix API request failed: " . curl_error($ch));
         }
         curl_close($ch);
+        
+        writeLog($pdo, 'ZABBIX_SYNC', 'API Response', $response);
 
         $decoded = json_decode($response, true);
         if (isset($decoded['error'])) {
@@ -71,11 +79,14 @@ try {
 
     // 2. Get default IDs for new devices
     $defaultTypeId = $pdo->query("SELECT id FROM device_types WHERE name = 'Discovered'")->fetchColumn();
+    writeLog($pdo, 'ZABBIX_SYNC', 'DB Query', "SELECT id FROM device_types WHERE name = 'Discovered' -> Got $defaultTypeId");
     $defaultBrandId = $pdo->query("SELECT id FROM brands WHERE name = 'Zabbix'")->fetchColumn();
+    writeLog($pdo, 'ZABBIX_SYNC', 'DB Query', "SELECT id FROM brands WHERE name = 'Zabbix' -> Got $defaultBrandId");
     
     $modelStmt = $pdo->prepare("SELECT id FROM models WHERE name = 'Zabbix Host' AND brand_id = ?");
     $modelStmt->execute([$defaultBrandId]);
     $defaultModelId = $modelStmt->fetchColumn();
+    writeLog($pdo, 'ZABBIX_SYNC', 'DB Query', "SELECT id FROM models WHERE name = 'Zabbix Host' AND brand_id = $defaultBrandId -> Got $defaultModelId");
 
     if (!$defaultTypeId || !$defaultBrandId || !$defaultModelId) {
         throw new Exception("Default categories for Zabbix import not found. Please run the setup script.");

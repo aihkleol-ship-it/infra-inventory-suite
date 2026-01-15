@@ -173,6 +173,7 @@
                 toast("Zabbix sync started...", 'info');
                 axios.get('api/trigger_zabbix_sync.php')
                     .then(res => {
+                        console.log("Zabbix sync response:", res.data);
                         if (res.data.status === 'success') {
                             toast(res.data.message, 'success');
                         } else {
@@ -181,7 +182,10 @@
                         setRawOutput(res.data.output);
                         setIsRawOutputModalOpen(true);
                     })
-                    .catch(err => toast("Sync trigger failed: " + (err.response?.data?.message || err.message), 'error'));
+                    .catch(err => {
+                        console.error("Zabbix sync error:", err);
+                        toast("Sync trigger failed: " + (err.response?.data?.message || err.message), 'error')
+                    });
             };
 
             const processedInventory = useMemo(() => {
@@ -613,6 +617,22 @@
 
         function RawOutputModal({ isOpen, onClose, output }) {
             if (!isOpen) return null;
+
+            const formattedOutput = useMemo(() => {
+                if (!output) return [];
+                return output.split('\n').map((line, index) => {
+                    let color = 'text-slate-600 dark:text-slate-300';
+                    if (line.includes('Error:')) {
+                        color = 'text-red-500';
+                    } else if (line.includes('Updated device') || line.includes('Created new device')) {
+                        color = 'text-green-500';
+                    } else if (line.includes('Skipped device')) {
+                        color = 'text-yellow-500';
+                    }
+                    return { text: line, color, key: index };
+                });
+            }, [output]);
+
             return (
                 <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -621,9 +641,11 @@
                             <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl">✕</button>
                         </div>
                         <div className="p-8 overflow-y-auto">
-                            <pre className="text-xs bg-slate-50 dark:bg-slate-800 p-4 rounded-lg text-slate-600 dark:text-slate-300 whitespace-pre-wrap">
-                                {output}
-                            </pre>
+                            <div className="text-xs bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+                                {formattedOutput.map(line => (
+                                    <pre key={line.key} className={`${line.color} whitespace-pre-wrap`}>{line.text}</pre>
+                                ))}
+                            </div>
                         </div>
                         <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
                             <button onClick={onClose} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-300 dark:hover:bg-slate-600">
