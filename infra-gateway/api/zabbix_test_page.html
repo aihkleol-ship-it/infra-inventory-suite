@@ -58,7 +58,10 @@
                         params: {
                             output: ["hostid", "host", "name", "status"],
                             selectInterfaces: ["ip", "dns", "port"],
-                            selectInventory: "extend"
+                            selectInventory: "extend",
+                            filter: {
+                                "status": [0, 1, 2]
+                            }
                         },
                         auth: token,
                         id: 2
