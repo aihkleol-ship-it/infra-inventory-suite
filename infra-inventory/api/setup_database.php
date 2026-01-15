@@ -172,6 +172,21 @@ SQL;
                 $pdo->exec($sql);
                 echo "✓ All tables created successfully.\n";
                 echo "✓ Default data seeded.\n";
+
+                // --- VERIFICATION STEP ---
+                echo "\n→ Verifying seeded data...\n";
+                $typeCount = $pdo->query("SELECT COUNT(*) FROM device_types WHERE name = 'Discovered'")->fetchColumn();
+                $brandCount = $pdo->query("SELECT COUNT(*) FROM brands WHERE name = 'Zabbix'")->fetchColumn();
+                $modelCount = $pdo->query("SELECT COUNT(*) FROM models WHERE name = 'Zabbix Host'")->fetchColumn();
+
+                if ($typeCount > 0 && $brandCount > 0 && $modelCount > 0) {
+                    echo "✓ Verification successful! Default categories are present.\n";
+                } else {
+                    echo "✗ Verification failed! Default categories were not created correctly.\n";
+                    echo "  - 'Discovered' in device_types: $typeCount\n";
+                    echo "  - 'Zabbix' in brands: $brandCount\n";
+                    echo "  - 'Zabbix Host' in models: $modelCount\n";
+                }
             } else {
                 echo "→ Detected existing installation. Checking for upgrades...\n";
                 
