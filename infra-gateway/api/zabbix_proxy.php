@@ -64,6 +64,7 @@ function getZabbixAuthToken($pdo, $settings) {
         'id' => 1,
     ];
 
+    error_log("Zabbix URL for authentication: " . $settings['zabbix_url']); // ADDED LOGGING
     $ch = curl_init($settings['zabbix_url']);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -94,6 +95,7 @@ try {
         $input['auth'] = getZabbixAuthToken($pdo, $settings);
     }
 
+    error_log("Zabbix URL for API call: " . $zabbix_url); // ADDED LOGGING
     $ch = curl_init($zabbix_url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);

@@ -35,7 +35,7 @@ try {
         'jsonrpc' => '2.0',
         'method' => 'user.login',
         'params' => [
-            'user' => $zabbix_user,
+            'username' => $zabbix_user,
             'password' => $zabbix_pass,
         ],
         'id' => 1,
@@ -46,6 +46,7 @@ try {
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($auth_request));
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json-rpc"]);
+    error_log(json_encode($auth_request));
     $response = curl_exec($ch);
     curl_close($ch);
 
@@ -75,6 +76,6 @@ try {
 
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "Zabbix Test Error: " . $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "Zabbix Test Error: " . $e->getMessage() . " Request: " . json_encode($auth_request)]);
 }
 ?>
