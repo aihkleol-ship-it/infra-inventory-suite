@@ -11,9 +11,19 @@ $output = fopen('php://output', 'w');
 fputcsv($output, ['Hostname', 'IP Address', 'Serial Number', 'Type', 'Brand', 'Model', 'EOS Date', 'Location', 'Sub Location', 'Status', 'Asset ID', 'Firmware', 'Notes']);
 
 $sql = "SELECT 
-            i.hostname, i.ip_address, i.serial_number, dt.name, b.name, m.name, m.eos_date, 
-            i.location, i.sub_location, -- Added here
-            i.status, i.asset_id, i.firmware_version, i.notes
+            i.hostname, 
+            i.ip_address, 
+            i.serial_number, 
+            dt.name AS type_name, 
+            b.name AS brand_name, 
+            m.name AS model_name, 
+            m.eos_date, 
+            i.location, 
+            i.sub_location,
+            i.status, 
+            i.asset_id, 
+            i.firmware_version, 
+            i.notes
         FROM inventory i
         LEFT JOIN device_types dt ON i.type_id = dt.id
         LEFT JOIN brands b ON i.brand_id = b.id
@@ -22,6 +32,6 @@ $sql = "SELECT
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute();
-while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) { fputcsv($output, $row); }
+while ($row = $stmt->fetch(PDO::FETCH_NUM)) { fputcsv($output, $row); }
 fclose($output); exit();
 ?>
