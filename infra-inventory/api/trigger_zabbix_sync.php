@@ -14,7 +14,7 @@ if (php_sapi_name() !== 'cli' && (!isset($_SESSION['user_id']) || $_SESSION['rol
 header('Content-Type: application/json');
 
 // Execute the cron script
-$command = 'php ' . __DIR__ . '/cron_zabbix_sync.php';
+$command = '/usr/bin/php ' . __DIR__ . '/cron_zabbix_sync.php';
 writeLog($pdo, 'ZABBIX_SYNC_TRIGGER', 'Command', $command);
 
 // Execute the command and capture the output
