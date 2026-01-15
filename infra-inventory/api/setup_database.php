@@ -206,6 +206,41 @@ SQL;
                 // Add future migration checks here in else-if blocks
             }
 
+            // --- Data Integrity Check (Always Run) ---
+            echo "\n→ Performing data integrity check for Zabbix categories...\n";
+            
+            // Check and create 'Discovered' device type
+            $typeCount = $pdo->query("SELECT COUNT(*) FROM device_types WHERE name = 'Discovered'")->fetchColumn();
+            if ($typeCount == 0) {
+                $pdo->exec("INSERT INTO `device_types` (`name`) VALUES ('Discovered');");
+                echo "  ✓ 'Discovered' device type created.\n";
+            } else {
+                echo "  ✓ 'Discovered' device type already exists.\n";
+            }
+
+            // Check and create 'Zabbix' brand
+            $brandCount = $pdo->query("SELECT COUNT(*) FROM brands WHERE name = 'Zabbix'")->fetchColumn();
+            if ($brandCount == 0) {
+                $pdo->exec("INSERT INTO `brands` (`name`) VALUES ('Zabbix');");
+                echo "  ✓ 'Zabbix' brand created.\n";
+            } else {
+                echo "  ✓ 'Zabbix' brand already exists.\n";
+            }
+
+            // Check and create 'Zabbix Host' model
+            $zabbixBrandId = $pdo->query("SELECT id FROM brands WHERE name = 'Zabbix'")->fetchColumn();
+            if ($zabbixBrandId) {
+                $modelCount = $pdo->query("SELECT COUNT(*) FROM models WHERE name = 'Zabbix Host' AND brand_id = $zabbixBrandId")->fetchColumn();
+                if ($modelCount == 0) {
+                    $pdo->exec("INSERT INTO `models` (`brand_id`, `name`) VALUES ($zabbixBrandId, 'Zabbix Host');");
+                    echo "  ✓ 'Zabbix Host' model created.\n";
+                } else {
+                    echo "  ✓ 'Zabbix Host' model already exists.\n";
+                }
+            } else {
+                echo "  ✗ Could not verify 'Zabbix Host' model because 'Zabbix' brand is missing.\n";
+            }
+
             echo "</div>";
             
             echo "<div class='success-box'>";
