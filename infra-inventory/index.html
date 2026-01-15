@@ -169,6 +169,7 @@
             const [sortConfig, setSortConfig] = useState({ key: 'hostname', direction: 'ascending' });
             
             const handleSyncZabbix = () => {
+                console.log("handleSyncZabbix called via button click");
                 toast("Zabbix sync started in the background...", 'info');
                 axios.get('api/trigger_zabbix_sync.php')
                     .then(res => {
