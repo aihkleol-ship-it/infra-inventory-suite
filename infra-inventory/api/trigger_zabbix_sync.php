@@ -14,10 +14,13 @@ if (php_sapi_name() !== 'cli' && (!isset($_SESSION['user_id']) || $_SESSION['rol
 header('Content-Type: application/json');
 
 // Execute the cron script
-$phpExecutable = 'C:\laragon\bin\php\php-8.3.28-Win32-vs16-x64\php.exe';
-if (!is_executable($phpExecutable)) {
-    // Attempt to find PHP executable in PATH if direct path fails
-    $phpExecutable = 'php'; 
+$phpExecutable = 'php';
+if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+    // Try to find a Windows-specific path if possible, otherwise default to 'php'
+    $winPath = 'C:\laragon\bin\php\php-8.3.28-Win32-vs16-x64\php.exe';
+    if(is_executable($winPath)){
+        $phpExecutable = $winPath;
+    }
 }
 $command = $phpExecutable . ' ' . __DIR__ . '/cron_zabbix_sync.php';
 writeLog($pdo, 'ZABBIX_SYNC_TRIGGER', 'Command', $command);

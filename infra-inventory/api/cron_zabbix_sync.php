@@ -100,6 +100,10 @@ try {
         'selectInventory' => ['serialno_a']
     ]);
     
+    $zabbixHostsCount = count($zabbixHosts);
+    echo "Found " . $zabbixHostsCount . " hosts in Zabbix.\n";
+    writeLog($pdo, 'ZABBIX_SYNC', 'Hosts Found', "Found $zabbixHostsCount hosts in Zabbix.");
+    
     // 4. Get all devices from the inventory to create a lookup map
     $stmt = $pdo->query("SELECT id, serial_number, hostname, ip_address FROM inventory");
     $allDevices = $stmt->fetchAll(PDO::FETCH_ASSOC);
