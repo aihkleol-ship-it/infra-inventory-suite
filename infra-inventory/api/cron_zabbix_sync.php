@@ -70,13 +70,12 @@ try {
         throw new Exception("Default categories for Zabbix import not found. Please run the setup script.");
     }
 
-    // 3. Get all hosts from Zabbix with serial number
+    // 3. Get all hosts from Zabbix
     echo "Fetching hosts from Zabbix...\n";
     $zabbixHosts = callZabbixApi('host.get', [
         'output' => ['host', 'name'],
         'selectInterfaces' => ['ip'],
-        'selectInventory' => ['serialno_a'],
-        'filter' => ['serialno_a' => ''] // Zabbix filter for not empty
+        'selectInventory' => ['serialno_a']
     ]);
     
     // 4. Get all devices from the inventory to create a lookup map
