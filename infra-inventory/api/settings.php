@@ -20,6 +20,10 @@ if ($method === 'GET') {
             "gateway" => [
                 "url" => $all['gateway_url'] ?? "",
                 "key" => $all['gateway_key'] ?? ""
+            ],
+            "zabbix" => [
+                "url" => $all['zabbix_url'] ?? "",
+                "user" => $all['zabbix_user'] ?? ""
             ]
         ]);
     } catch (Exception $e) { echo json_encode(["error" => "Settings load failed"]); }
@@ -47,6 +51,26 @@ elseif ($method === 'POST') {
             
             writeLog($pdo, 'CONFIG', 'Gateway Settings', 'Updated API connection details');
             echo json_encode(["success" => true, "message" => "Connection saved"]);
+        }
+
+        // --- Save Zabbix Config ---
+        elseif ($input['action'] === 'save_zabbix_config') {
+            $data = $input['data'];
+            
+            $stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+            
+            $stmt->execute(['zabbix_url', $data['zabbix_url'] ?? null, $data['zabbix_url'] ?? null]);
+            $stmt->closeCursor();
+            $stmt->execute(['zabbix_user', $data['zabbix_user'] ?? null, $data['zabbix_user'] ?? null]);
+            $stmt->closeCursor();
+
+            if (!empty($data['zabbix_pass'])) {
+                $stmt->execute(['zabbix_pass', $data['zabbix_pass'], $data['zabbix_pass']]);
+                $stmt->closeCursor();
+            }
+            
+            writeLog($pdo, 'CONFIG', 'Zabbix Settings', 'Updated Zabbix API connection details');
+            echo json_encode(["success" => true, "message" => "Zabbix settings saved"]);
         }
 
         // --- Master Data (Brands/Models) - Kept Same ---

@@ -239,17 +239,28 @@
 
             // Gateway Config (Replaces SMTP)
             const [gatewayConfig, setGatewayConfig] = useState({ alert_email: "", gateway_url: "", gateway_key: "" });
+            const [zabbixConfig, setZabbixConfig] = useState({ zabbix_url: "", zabbix_user: "", zabbix_pass: "" });
 
             useEffect(() => { 
                 if (activeTab === 'users' && currentUser.role === 'admin') axios.get('api/users.php').then(res => setUsers(res.data)); 
-                if (activeTab === 'notifications') {
+                if (activeTab === 'notifications' || activeTab === 'zabbix') {
                     axios.get('api/settings.php').then(res => {
-                        const g = res.data.gateway;
-                        setGatewayConfig({
-                            alert_email: res.data.alert_email, 
-                            gateway_url: g.url,
-                            gateway_key: g.key
-                        });
+                        if (res.data.gateway) {
+                            const g = res.data.gateway;
+                            setGatewayConfig({
+                                alert_email: res.data.alert_email, 
+                                gateway_url: g.url,
+                                gateway_key: g.key
+                            });
+                        }
+                        if (res.data.zabbix) {
+                            const z = res.data.zabbix;
+                            setZabbixConfig({
+                                zabbix_url: z.url,
+                                zabbix_user: z.user,
+                                zabbix_pass: ""
+                            });
+                        }
                     });
                 }
             }, [activeTab]);
@@ -265,12 +276,32 @@
             
             const handleSaveGateway = (e) => { e.preventDefault(); axios.post('api/settings.php', { action: 'save_gateway_config', data: gatewayConfig }).then(res => { if(res.data.success) toast("Connection Saved", 'success'); else toast("Failed", 'error'); }).catch(e => toast("Error saving", 'error')); };
             const handleTestEmail = () => { const btn = document.getElementById('testBtn'); const orig = btn.innerText; btn.innerText = "Sending..."; btn.disabled=true; axios.get('api/test_gateway.php').then(res => { if(res.data.status==='success') toast("Gateway Test Success!", 'success'); else toast(res.data.message, 'warning'); }).catch(e => toast("Send Failed: " + (e.response?.data?.message || e.message), 'error')).finally(() => { btn.innerText = orig; btn.disabled=false; }); };
+            const handleSaveZabbix = (e) => { e.preventDefault(); axios.post('api/settings.php', { action: 'save_zabbix_config', data: zabbixConfig }).then(res => { if(res.data.success) toast("Zabbix Settings Saved", 'success'); else toast("Failed", 'error'); }).catch(e => toast("Error saving", 'error')); };
+            const handleTestZabbix = () => {
+                const btn = document.getElementById('testZabbixBtn');
+                const orig = btn.innerText;
+                btn.innerText = "Testing...";
+                btn.disabled = true;
+                axios.get('api/zabbix_test.php')
+                    .then(res => {
+                        if (res.data.status === 'success') {
+                            toast("Zabbix Test Success!", 'success');
+                        } else {
+                            toast(res.data.message, 'warning');
+                        }
+                    })
+                    .catch(e => toast("Test Failed: " + (e.response?.data?.message || e.message), 'error'))
+                    .finally(() => {
+                        btn.innerText = orig;
+                        btn.disabled = false;
+                    });
+            };
 
             return (
                 <div className="p-8 max-w-6xl mx-auto animate-fade-in">
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">Settings</h2>
                     <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-8 w-fit flex-wrap">
-                        {['master', 'users', 'notifications', 'backup'].map(tab => (
+                        {['master', 'users', 'notifications', 'zabbix', 'backup'].map(tab => (
                             <button key={tab} onClick={()=>setActiveTab(tab)} className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab===tab ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
                                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
                             </button>
@@ -329,6 +360,43 @@
                                     <div className="flex gap-3 pt-4">
                                         <button type="submit" className="flex-1 bg-slate-900 dark:bg-brand-600 text-white font-bold py-2.5 rounded-lg hover:bg-slate-800 dark:hover:bg-brand-700 transition-all">Save Connection</button>
                                         <button type="button" id="testBtn" onClick={handleTestEmail} className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
+                                            Test Connection
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                    {activeTab === 'zabbix' && (
+                        <div className="max-w-2xl mx-auto">
+                            <div className="bg-white dark:bg-slate-850 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+                                <div className="text-center mb-8">
+                                    <div className="w-16 h-16 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl"><i className="ph ph-plugs"></i></div>
+                                    <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Zabbix Configuration</h3>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                                        Configure the direct connection to your Zabbix API.
+                                    </p>
+                                </div>
+                                
+                                <form onSubmit={handleSaveZabbix} className="space-y-4 text-left">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Zabbix API URL</label>
+                                        <input required className="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm font-mono dark:bg-slate-900 dark:text-white" value={zabbixConfig.zabbix_url} onChange={e=>setZabbixConfig({...zabbixConfig, zabbix_url:e.target.value})} placeholder="http://zabbix.example.com/api_jsonrpc.php" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">API User</label>
+                                            <input required className="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900 dark:text-white" value={zabbixConfig.zabbix_user} onChange={e=>setZabbixConfig({...zabbixConfig, zabbix_user:e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">API Password</label>
+                                            <input type="password" required className="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900 dark:text-white" value={zabbixConfig.zabbix_pass} onChange={e=>setZabbixConfig({...zabbixConfig, zabbix_pass:e.target.value})} placeholder="••••••••" />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3 pt-4">
+                                        <button type="submit" className="flex-1 bg-slate-900 dark:bg-brand-600 text-white font-bold py-2.5 rounded-lg hover:bg-slate-800 dark:hover:bg-brand-700 transition-all">Save Zabbix Settings</button>
+                                        <button type="button" id="testZabbixBtn" onClick={handleTestZabbix} className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
                                             Test Connection
                                         </button>
                                     </div>

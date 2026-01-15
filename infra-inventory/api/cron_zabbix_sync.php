@@ -12,22 +12,30 @@ echo "Zabbix Sync Started: " . date('Y-m-d H:i:s') . "\n";
 try {
     writeLog($pdo, 'ZABBIX_SYNC', 'Initiated', 'Zabbix sync script started.');
 
-    // 1. Get Gateway settings from infra-inventory's settings
+    // 1. Get Zabbix settings from infra-inventory's settings
     $stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings");
     $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
-    $gatewayUrl = $settings['gateway_url'] ?? '';
-    $gatewayKey = $settings['gateway_key'] ?? '';
+    $zabbixUrl = $settings['zabbix_url'] ?? '';
+    $zabbixUser = $settings['zabbix_user'] ?? '';
+    $zabbixPass = $settings['zabbix_pass'] ?? '';
 
-    if (empty($gatewayUrl) || empty($gatewayKey)) {
-        throw new Exception("InfraGateway not configured in inventory settings.");
+    if (empty($zabbixUrl) || empty($zabbixUser) || empty($zabbixPass)) {
+        throw new Exception("Zabbix API not configured in inventory settings.");
     }
-    
-    $zabbixProxyUrl = str_replace('send.php', 'zabbix_proxy.php', $gatewayUrl);
 
-    // Helper function to make requests to the proxy
+    $zabbixAuthToken = null;
+
     function callZabbixApi($method, $params) {
-        global $zabbixProxyUrl, $gatewayKey;
+        global $zabbixUrl, $zabbixUser, $zabbixPass, $zabbixAuthToken;
+
+        if ($zabbixAuthToken === null && $method !== 'user.login') {
+            $login_params = [
+                'username' => $zabbixUser,
+                'password' => $zabbixPass,
+            ];
+            $zabbixAuthToken = callZabbixApi('user.login', $login_params);
+        }
 
         $request = [
             'jsonrpc' => '2.0',
@@ -35,14 +43,17 @@ try {
             'params' => $params,
             'id' => time(),
         ];
+        
+        if ($method !== 'user.login') {
+            $request['auth'] = $zabbixAuthToken;
+        }
 
-        $ch = curl_init($zabbixProxyUrl);
+        $ch = curl_init($zabbixUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($request));
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Content-Type: application/json-rpc",
-            "Authorization: Bearer $gatewayKey"
         ]);
 
         $response = curl_exec($ch);

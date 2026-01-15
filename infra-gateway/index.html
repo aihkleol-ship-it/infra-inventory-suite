@@ -187,48 +187,6 @@
             );
         }
 
-        function ZabbixView({ config, onRefresh, onAuthError }) {
-            const [form, setForm] = useState(config || {});
-            useEffect(() => setForm(config || {}), [config]);
-            const save = (e) => {
-                e.preventDefault();
-                axios.post('api/admin.php', {action: 'save_zabbix', ...form})
-                    .then(() => { alert("Saved!"); onRefresh(); })
-                    .catch(err => {
-                        if (err.response && err.response.status === 401) {
-                            onAuthError();
-                        } else {
-                            alert(err.response?.data?.message || "An error occurred.");
-                        }
-                    });
-            };
-
-            const testConnection = () => {
-                axios.get('api/zabbix_test.php')
-                    .then(res => alert("Success: " + res.data.message))
-                    .catch(err => alert("Error: " + (err.response?.data?.message || "An unknown error occurred.")));
-            };
-
-            return (
-                <div className="p-8 max-w-2xl mx-auto animate-fade-in">
-                    <h2 className="text-2xl font-bold text-white mb-6">Zabbix API Configuration</h2>
-                    <div className="bg-slate-800 p-8 rounded-xl border border-slate-700">
-                        <form onSubmit={save} className="space-y-5">
-                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Zabbix API URL</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.url||''} onChange={e=>setForm({...form, url:e.target.value})} placeholder="http://zabbix.example.com/api_jsonrpc.php" /></div>
-                            <div className="grid grid-cols-2 gap-5">
-                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">API User</label><input className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.user||''} onChange={e=>setForm({...form, user:e.target.value})} /></div>
-                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">API Password</label><input type="password" className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm" value={form.pass||''} onChange={e=>setForm({...form, pass:e.target.value})} placeholder="••••••" /></div>
-                            </div>
-                            <div className="flex gap-4">
-                                <button type="button" onClick={testConnection} className="w-full bg-slate-600 text-white font-bold py-3 rounded hover:bg-slate-500">Test Connection</button>
-                                <button className="w-full bg-blue-600 text-white font-bold py-3 rounded hover:bg-blue-500">Update Zabbix Settings</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            );
-        }
-
         function LogsView({ logs }) {
             return (
                 <div className="p-8 max-w-6xl mx-auto animate-fade-in">
@@ -285,7 +243,6 @@
                         <nav className="flex-1 p-4 space-y-2">
                             <NavItem active={view==='clients'} icon="ph-app-window" label="API Clients" onClick={()=>setView('clients')} />
                             <NavItem active={view==='config'} icon="ph-gear" label="SMTP Config" onClick={()=>setView('config')} />
-                            <NavItem active={view==='zabbix'} icon="ph-plugs" label="Zabbix Config" onClick={()=>setView('zabbix')} />
                             <NavItem active={view==='admins'} icon="ph-users" label="Admin Users" onClick={()=>setView('admins')} />
                             <NavItem active={view==='logs'} icon="ph-list-dashes" label="Traffic Logs" onClick={()=>setView('logs')} />
                         </nav>
@@ -295,7 +252,6 @@
                         {view === 'clients' && <ClientsView clients={data.clients} onRefresh={fetchData} />}
                         {view === 'admins' && <UsersView admins={data.admins} currentUser={user} onRefresh={fetchData} />}
                         {view === 'config' && <ConfigView config={data.config} onRefresh={fetchData} onAuthError={handleAuthError} />}
-                        {view === 'zabbix' && <ZabbixView config={data.zabbix} onRefresh={fetchData} onAuthError={handleAuthError} />}
                         {view === 'logs' && <LogsView logs={data.logs} />}
                     </main>
                 </div>
