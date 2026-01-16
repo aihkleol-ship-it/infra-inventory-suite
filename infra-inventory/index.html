@@ -162,7 +162,7 @@
         }
 
         // --- INVENTORY VIEW ---
-        function InventoryView({ inventory, user, fetchData, onImportOpen, onEdit, onDelete, riskFilter, setRiskFilter, setRawOutput, setIsRawOutputModalOpen }) {
+        function InventoryView({ inventory, user, options, fetchData, onImportOpen, onEdit, onDelete, riskFilter, setRiskFilter, setRawOutput, setIsRawOutputModalOpen }) {
             const toast = useToast();
             const [searchTerm, setSearchTerm] = useState("");
             const [locationFilter, setLocationFilter] = useState("");
@@ -198,11 +198,13 @@
             }, [inventory, searchTerm, locationFilter, sortConfig, riskFilter]);
             const uniqueLocations = useMemo(() => [...new Set(inventory.map(i => i.location).filter(Boolean))].sort(), [inventory]);
 
+            const typesMap = useMemo(() => (options.types || []).reduce((acc, t) => { acc[t.id] = t.name; return acc; }, {}), [options.types]);
+
             return (
                 <div className="p-8 animate-fade-in h-screen flex flex-col box-border">
                     <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-6 shrink-0 gap-4">
                         <div><h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Inventory List</h2><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Complete database of all tracked assets.</p></div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                             <button onClick={handleSyncZabbix} className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-900 text-purple-600 dark:text-purple-400 px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 text-sm font-bold hover:border-purple-300 dark:hover:border-purple-700 hover:text-purple-700 dark:hover:text-purple-300 transition-all"><i className="ph ph-plugs text-lg"></i> Sync Zabbix</button>
                             <a href="api/export.php" target="_blank" className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 text-sm font-bold hover:border-brand-200 dark:hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 transition-all"><i className="ph ph-download-simple text-lg"></i> Export</a>
                             {user.role !== 'viewer' && (<><button onClick={onImportOpen} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 text-sm font-bold hover:border-brand-200 dark:hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 transition-all"><i className="ph ph-upload-simple text-lg"></i> Import</button><button onClick={() => onEdit(null)} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-brand-200 dark:shadow-none flex items-center gap-2 text-sm font-bold hover:bg-brand-700 transition-all transform hover:-translate-y-0.5"><i className="ph ph-plus text-lg"></i> Add Device</button></>)}
@@ -217,8 +219,23 @@
                             <button onClick={fetchData} className="p-2.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-xl transition-all"><i className="ph ph-arrows-clockwise text-xl"></i></button>
                         </div>
                         <div className="flex-1 overflow-auto table-container bg-white dark:bg-slate-850">
-                            <table className="w-full text-left border-collapse"><thead className="sticky-header text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/50"><tr>{[{k:'hostname',l:'Hostname'},{k:'ip_address',l:'IP Address'},{k:'brand',l:'Brand'},{k:'model',l:'Model'},{k:'location',l:'Location'},{k:'rack',l:'Rack'},{k:'rack_position',l:'Position'},{k:'status',l:'Status'}].map(h=>(<th key={h.k} onClick={()=>setSortConfig({key:h.k, direction:sortConfig.key===h.k&&sortConfig.direction==='ascending'?'descending':'ascending'})} className="px-6 py-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors select-none">{h.l} {sortConfig.key===h.k && <i className={`ph ${sortConfig.direction==='ascending'?'ph-caret-up':'ph-caret-down'} ml-1 align-middle`}></i>}</th>))}{user.role!=='viewer' && <th className="px-6 py-4 text-right">Actions</th>}</tr></thead>
-                                <tbody className="text-sm text-slate-600 dark:text-slate-400 divide-y divide-slate-100 dark:divide-slate-800">{processedInventory.map(item => { const eos = getEOSMeta(item.eos_date); return (<tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group"><td className="px-6 py-3.5"><div className="font-bold text-slate-800 dark:text-slate-200">{item.hostname}</div><div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">{item.serial_number || '-'}</div></td><td className="px-6 py-3.5 font-mono text-slate-500 dark:text-slate-400 text-xs bg-slate-50/50 dark:bg-slate-800/50 rounded-lg">{item.ip_address}</td><td className="px-6 py-3.5">{item.brand}</td><td className="px-6 py-3.5"><div>{item.model}</div>{item.eos_date && <div className={`inline-block mt-1 ${eos.class}`}>{eos.label}</div>}</td><td className="px-6 py-3.5">{item.location}</td><td className="px-6 py-3.5">{item.rack}</td><td className="px-6 py-3.5">{item.rack_position}</td><td className="px-6 py-3.5"><span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${item.status==='Active'?'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-900/50':item.status==='Decommissioned'?'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700':'bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-900/50'}`}><span className={`w-1.5 h-1.5 rounded-full ${item.status==='Active'?'bg-emerald-500':item.status==='Decommissioned'?'bg-slate-400':'bg-blue-500'}`}></span>{item.status}</span></td>{user.role!=='viewer' && (<td className="px-6 py-3.5 text-right"><div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => onEdit(item)} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-all"><i className="ph ph-pencil-simple text-lg"></i></button><button onClick={() => onDelete(item.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"><i className="ph ph-trash text-lg"></i></button></div></td>)}</tr>); })}</tbody>
+                            <table className="w-full text-left border-collapse"><thead className="sticky-header text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/50"><tr>{[
+                                {k:'hostname',l:'Hostname'},{k:'ip_address',l:'IP Address'},{k:'type_id',l:'Type'},{k:'brand',l:'Brand'},{k:'model',l:'Model'},{k:'location',l:'Location'},{k:'rack',l:'Rack'},{k:'rack_position',l:'Position'},{k:'status',l:'Status'},{k:'asset_id',l:'Asset ID'},{k:'firmware_version',l:'Firmware'},{k:'notes',l:'Notes'}
+                                ].map(h=>(<th key={h.k} onClick={()=>setSortConfig({key:h.k, direction:sortConfig.key===h.k&&sortConfig.direction==='ascending'?'descending':'ascending'})} className="px-6 py-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors select-none">{h.l} {sortConfig.key===h.k && <i className={`ph ${sortConfig.direction==='ascending'?'ph-caret-up':'ph-caret-down'} ml-1 align-middle`}></i>}</th>))}{user.role!=='viewer' && <th className="px-6 py-4 text-right">Actions</th>}</tr></thead>
+                                <tbody className="text-sm text-slate-600 dark:text-slate-400 divide-y divide-slate-100 dark:divide-slate-800">{processedInventory.map(item => { const eos = getEOSMeta(item.eos_date); return (<tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group">
+                                    <td className="px-6 py-3.5"><div className="font-bold text-slate-800 dark:text-slate-200">{item.hostname}</div><div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">{item.serial_number || '-'}</div></td>
+                                    <td className="px-6 py-3.5 font-mono text-slate-500 dark:text-slate-400 text-xs bg-slate-50/50 dark:bg-slate-800/50 rounded-lg">{item.ip_address}</td>
+                                    <td className="px-6 py-3.5">{typesMap[item.type_id] || 'N/A'}</td>
+                                    <td className="px-6 py-3.5">{item.brand}</td>
+                                    <td className="px-6 py-3.5"><div>{item.model}</div>{item.eos_date && <div className={`inline-block mt-1 ${eos.class}`}>{eos.label}</div>}</td>
+                                    <td className="px-6 py-3.5">{item.location}</td>
+                                    <td className="px-6 py-3.5">{item.rack}</td>
+                                    <td className="px-6 py-3.5">{item.rack_position}</td>
+                                    <td className="px-6 py-3.5"><span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${item.status==='Active'?'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-900/50':item.status==='Decommissioned'?'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700':'bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-900/50'}`}><span className={`w-1.5 h-1.5 rounded-full ${item.status==='Active'?'bg-emerald-500':item.status==='Decommissioned'?'bg-slate-400':'bg-blue-500'}`}></span>{item.status}</span></td>
+                                    <td className="px-6 py-3.5">{item.asset_id}</td>
+                                    <td className="px-6 py-3.5">{item.firmware_version}</td>
+                                    <td className="px-6 py-3.5 truncate max-w-xs">{item.notes}</td>
+                                    {user.role!=='viewer' && (<td className="px-6 py-3.5 text-right"><div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => onEdit(item)} className="p-2 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"><i className="ph ph-pencil-simple"></i></button><button onClick={() => onDelete(item.id)} className="p-2 text-slate-400 hover:text-red-500 dark:hover:text-red-400"><i className="ph ph-trash"></i></button></div></td>)}</tr>); })}</tbody>
                             </table>
                         </div>
                         <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-xs text-slate-400 dark:text-slate-500 text-right font-medium shrink-0">Showing {processedInventory.length} assets</div>
@@ -582,14 +599,29 @@
             return (<div className="p-8 max-w-6xl mx-auto animate-fade-in"><h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">Audit Logs</h2><div className="bg-white dark:bg-slate-850 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"><table className="w-full text-sm text-left"><thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold"><tr><th className="p-4">Time</th><th className="p-4">User</th><th className="p-4">Action</th><th className="p-4">Details</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{logs.map(l=><tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800"><td className="p-4 text-slate-400 dark:text-slate-500 text-xs font-mono">{l.created_at}</td><td className="p-4 font-bold text-slate-700 dark:text-slate-300">{l.username}</td><td className="p-4"><span className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-xs font-bold text-slate-600 dark:text-slate-300">{l.action}</span></td><td className="p-4 text-slate-600 dark:text-slate-400">{l.target} - <span className="text-slate-400 dark:text-slate-500">{l.details}</span></td></tr>)}</tbody></table></div></div>);
         }
 
-        function Layout({ user, currentView, onViewChange, onLogout, children }) {
+        function Layout({ user, currentView, onViewChange, onLogout, children, isMenuMinimized, setIsMenuMinimized }) {
             const menuItems = [ { id: 'dashboard', label: 'Dashboard', icon: 'ph-chart-pie-slice' }, { id: 'inventory', label: 'Inventory', icon: 'ph-rows' }, { id: 'rack', label: 'Rack View', icon: 'ph-stack' }, { id: 'logs', label: 'Activity Logs', icon: 'ph-clipboard-text' }, ...(user.role !== 'viewer' ? [{ id: 'settings', label: 'Settings', icon: 'ph-gear' }] : []) ];
             return (
                 <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
-                    <aside className="w-64 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 z-20">
-                        <div className="p-6 flex items-center gap-3"><div className="bg-brand-600 text-white p-2 rounded-lg shadow-lg shadow-brand-200 dark:shadow-none"><i className="ph ph-hard-drives text-xl"></i></div><span className="font-bold text-lg tracking-tight text-slate-800 dark:text-white">InfraInv</span></div>
-                        <nav className="flex-1 px-4 space-y-1.5 py-6">{menuItems.map(i=><button key={i.id} onClick={()=>onViewChange(i.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${currentView===i.id?'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 shadow-sm ring-1 ring-brand-100 dark:ring-0':'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white'}`}><i className={`ph ${i.icon} text-lg`}></i>{i.label}</button>)}</nav>
-                        <div className="p-4 border-t border-slate-100 dark:border-slate-800"><div className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 mb-2"><div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900 text-brand-600 dark:text-brand-300 flex items-center justify-center font-bold text-xs">{user.username.substr(0,2).toUpperCase()}</div><div className="overflow-hidden"><div className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{user.username}</div><div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">{user.role}</div></div></div><button onClick={onLogout} className="w-full text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 rounded-lg font-medium transition-colors">Sign Out</button></div>
+                    <aside className={`bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 z-20 transition-all duration-300 relative ${isMenuMinimized ? 'w-20' : 'w-64'}`}>
+                        <div className={`p-6 flex items-center gap-3 ${isMenuMinimized && 'justify-center'}`}>
+                            <div className="bg-brand-600 text-white p-2 rounded-lg shadow-lg shadow-brand-200 dark:shadow-none"><i className="ph ph-hard-drives text-xl"></i></div>
+                            {!isMenuMinimized && <span className="font-bold text-lg tracking-tight text-slate-800 dark:text-white">InfraInv</span>}
+                        </div>
+                        <button onClick={() => setIsMenuMinimized(!isMenuMinimized)} className="absolute top-5 -right-3.5 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full p-1 text-slate-400 hover:text-brand-500 z-30">
+                            <i className={`ph ph-caret-left text-lg transition-transform ${isMenuMinimized && 'rotate-180'}`}></i>
+                        </button>
+                        <nav className="flex-1 px-4 space-y-1.5 py-6">{menuItems.map(i=><button key={i.id} onClick={()=>onViewChange(i.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${isMenuMinimized && 'justify-center'} ${currentView===i.id?'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 shadow-sm ring-1 ring-brand-100 dark:ring-0':'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white'}`}><i className={`ph ${i.icon} text-lg`}></i>{!isMenuMinimized && i.label}</button>)}</nav>
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-800">
+                            <div className={`flex items-center gap-3 p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 mb-2 ${isMenuMinimized && 'justify-center'}`}>
+                                <div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900 text-brand-600 dark:text-brand-300 flex items-center justify-center font-bold text-xs shrink-0">{user.username.substr(0,2).toUpperCase()}</div>
+                                {!isMenuMinimized && <div className="overflow-hidden"><div className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{user.username}</div><div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">{user.role}</div></div>}
+                            </div>
+                            <button onClick={onLogout} className={`w-full text-xs py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${isMenuMinimized ? 'justify-center text-red-500 hover:bg-red-50' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}>
+                                <i className="ph ph-sign-out text-lg"></i>
+                                {!isMenuMinimized && 'Sign Out'}
+                            </button>
+                        </div>
                     </aside>
                     <main className="flex-1 overflow-auto relative">{children}</main>
                 </div>
@@ -666,6 +698,7 @@
             const [searchTerm, setSearchTerm] = useState("");
             const [locationFilter, setLocationFilter] = useState("");
             const [sortConfig, setSortConfig] = useState({ key: 'hostname', direction: 'ascending' });
+            const [isMenuMinimized, setIsMenuMinimized] = useState(false);
             
             const [isImportOpen, setIsImportOpen] = useState(false);
             const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
@@ -737,7 +770,7 @@
 
             return (
                 <ToastProvider>
-                    <Layout user={user} currentView={view} onViewChange={handleViewChange} onLogout={handleLogout}>
+                    <Layout user={user} currentView={view} onViewChange={handleViewChange} onLogout={handleLogout} isMenuMinimized={isMenuMinimized} setIsMenuMinimized={setIsMenuMinimized}>
                         {view === 'dashboard' && <DashboardView inventory={inventory} onNavigateToRisks={()=>{ setRiskFilter(true); setView('inventory'); }} />}
                         {view === 'inventory' && <InventoryView {...dataProps} setRawOutput={setRawOutput} setIsRawOutputModalOpen={setIsRawOutputModalOpen} />}
                         {view === 'rack' && <RackView inventory={inventory} onDeviceMove={handleDeviceMove} />}

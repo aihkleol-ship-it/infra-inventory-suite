@@ -1,3 +1,7 @@
 # Ignore sensitive configuration files
 infra-system-config.php
 
+.gemini/apiguide.md
+.gitignore
+.gemini/styleguide.md
+.gemini/codingguide.md
