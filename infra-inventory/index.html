@@ -270,7 +270,15 @@
                         <div className="flex-1 overflow-auto table-container bg-white dark:bg-slate-850">
                             <table className="w-full text-left border-collapse"><thead className="sticky-header text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/50"><tr>{[
                                 {k:'hostname',l:'Hostname'},{k:'ip_address',l:'IP Address'},{k:'type_id',l:'Type'},{k:'brand',l:'Brand'},{k:'model',l:'Model'},{k:'size',l:'Size'},{k:'location',l:'Location'},{k:'rack',l:'Rack'},{k:'rack_position',l:'Position'},{k:'status',l:'Status'},{k:'asset_id',l:'Asset ID'},{k:'firmware_version',l:'Firmware'},{k:'notes',l:'Notes'}
-                                ].map(h=>(<th key={h.k} onClick={()=>setSortConfig({key:h.k, direction:sortConfig.key===h.k&&sortConfig.direction==='ascending'?'descending':'ascending'})} className="px-6 py-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors select-none">{h.l} {sortConfig.key===h.k && <i className={`ph ${sortConfig.direction==='ascending'?'ph-caret-up':'ph-caret-down'} ml-1 align-middle`}></i>}</th>))}{user.role!=='viewer' && <th className="px-6 py-4 text-right">Actions</th>}</tr></thead>
+                                ].map(h => (
+                                    <th 
+                                        key={h.k} 
+                                        onClick={h.k !== 'size' ? ()=>setSortConfig({key:h.k, direction:sortConfig.key===h.k&&sortConfig.direction==='ascending'?'descending':'ascending'}) : undefined} 
+                                        className={`px-6 py-4 select-none ${h.k !== 'size' ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors' : ''}`}
+                                    >
+                                        {h.l} {sortConfig.key === h.k && <i className={`ph ${sortConfig.direction === 'ascending' ? 'ph-caret-up' : 'ph-caret-down'} ml-1 align-middle`}></i>}
+                                    </th>
+                                ))}{user.role!=='viewer' && <th className="px-6 py-4 text-right">Actions</th>}</tr></thead>
                                 <tbody className="text-sm text-slate-600 dark:text-slate-400 divide-y divide-slate-100 dark:divide-slate-800">{processedInventory.map(item => { const eos = getEOSMeta(item.eos_date); const model = modelsMap[item.model_id]; return (<tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group">
                                     <td className="px-6 py-3.5"><div className="font-bold text-slate-800 dark:text-slate-200">{item.hostname}</div><div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">{item.serial_number || '-'}</div></td>
                                     <td className="px-6 py-3.5 font-mono text-slate-500 dark:text-slate-400 text-xs bg-slate-50/50 dark:bg-slate-800/50 rounded-lg">{item.ip_address}</td>
