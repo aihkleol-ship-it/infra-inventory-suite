@@ -201,7 +201,7 @@
                             i.hostname, i.ip_address, i.serial_number, i.asset_id,
                             i.firmware_version, i.location, i.rack, i.rack_position,
                             i.status, i.notes, typesMap[i.type_id], i.brand, i.model
-                        ].join(' ').toLowerCase();
+                        ].map(val => String(val ?? '')).join(' ').toLowerCase();
                         return searchableString.includes(s);
                     });
                 }
