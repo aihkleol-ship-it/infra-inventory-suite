@@ -80,12 +80,12 @@ elseif ($method === 'POST') {
             
             if (strpos($input['action'], 'add_') === 0) {
                 if ($type === 'brand') { $stmt = $pdo->prepare("INSERT INTO brands (name) VALUES (?)"); $stmt->execute([trim($input['name'])]); }
-                else { $stmt = $pdo->prepare("INSERT INTO models (brand_id, name, eos_date) VALUES (?, ?, ?)"); $stmt->execute([$input['brand_id'], trim($input['name']), $input['eos_date'] ?: null]); }
+                else { $stmt = $pdo->prepare("INSERT INTO models (brand_id, name, rack_units, eos_date) VALUES (?, ?, ?, ?)"); $stmt->execute([$input['brand_id'], trim($input['name']), $input['rack_units'] ?: 1, $input['eos_date'] ?: null]); }
                 writeLog($pdo, 'CREATE', ucfirst($type) . ": " . $input['name']);
             } 
             elseif (strpos($input['action'], 'edit_') === 0) {
                 if ($type === 'brand') { $stmt = $pdo->prepare("UPDATE brands SET name = ? WHERE id = ?"); $stmt->execute([trim($input['name']), $input['id']]); }
-                else { $stmt = $pdo->prepare("UPDATE models SET name = ?, brand_id = ?, eos_date = ? WHERE id = ?"); $stmt->execute([trim($input['name']), $input['brand_id'], $input['eos_date'] ?: null, $input['id']]); }
+                else { $stmt = $pdo->prepare("UPDATE models SET name = ?, brand_id = ?, rack_units = ?, eos_date = ? WHERE id = ?"); $stmt->execute([trim($input['name']), $input['brand_id'], $input['rack_units'] ?: 1, $input['eos_date'] ?: null, $input['id']]); }
                 writeLog($pdo, 'UPDATE', ucfirst($type) . " ID " . $input['id']);
             }
             elseif (strpos($input['action'], 'delete_') === 0) {

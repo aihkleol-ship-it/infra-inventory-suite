@@ -12,7 +12,7 @@ try {
     $brands = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 3. Fetch Models (Include brand_id for filtering on frontend)
-    $stmt = $pdo->query("SELECT id, brand_id, name, eos_date FROM models ORDER BY name ASC");
+    $stmt = $pdo->query("SELECT id, brand_id, name, rack_units, eos_date FROM models ORDER BY name ASC");
     $models = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([

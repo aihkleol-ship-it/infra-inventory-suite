@@ -118,7 +118,7 @@ header('Content-Type: text/html; charset=utf-8');
                 CREATE TABLE `users` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `username` VARCHAR(50) NOT NULL UNIQUE, `password_hash` VARCHAR(255) NOT NULL, `role` VARCHAR(20) DEFAULT 'editor', `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ) ENGINE=InnoDB;
                 CREATE TABLE `device_types` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(50) NOT NULL UNIQUE ) ENGINE=InnoDB;
                 CREATE TABLE `brands` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(50) NOT NULL UNIQUE ) ENGINE=InnoDB;
-                CREATE TABLE `models` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `brand_id` INT NOT NULL, `name` VARCHAR(100) NOT NULL, `eos_date` DATE DEFAULT NULL, FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE ) ENGINE=InnoDB;
+                CREATE TABLE `models` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `brand_id` INT NOT NULL, `name` VARCHAR(100) NOT NULL, `rack_units` INT DEFAULT 1, `eos_date` DATE DEFAULT NULL, FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON DELETE CASCADE ) ENGINE=InnoDB;
                 CREATE TABLE `audit_logs` ( `id` INT AUTO_INCREMENT PRIMARY KEY, `user_id` INT, `username` VARCHAR(50), `action` VARCHAR(20), `target` VARCHAR(100), `details` TEXT, `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ) ENGINE=InnoDB;
 
                 CREATE TABLE `inventory` (
@@ -201,6 +201,14 @@ SQL;
                     echo "  ✓ Migration v1.0 complete.\n";
                 } else {
                     echo "  ✓ Schema is up to date.\n";
+                }
+
+                // Add rack_units to models if it doesn't exist
+                $modelColumns = $pdo->query("SHOW COLUMNS FROM `models` LIKE 'rack_units'")->rowCount();
+                if ($modelColumns === 0) {
+                    echo "  → Applying migration (adding rack_units to models)...\n";
+                    $pdo->exec("ALTER TABLE `models` ADD COLUMN `rack_units` INT DEFAULT 1 AFTER `name`;");
+                    echo "  ✓ Migration for rack_units complete.\n";
                 }
 
                 // Add future migration checks here in else-if blocks
