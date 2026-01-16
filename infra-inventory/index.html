@@ -486,7 +486,7 @@
         }
 
         // --- RACK VIEW ---
-        function RackView({ inventory, onDeviceMove }) {
+        function RackView({ inventory, onDeviceMove, modelsMap }) {
             const { DndProvider, useDrag, useDrop } = ReactDnD;
             const { HTML5Backend } = ReactDnDHTML5Backend;
 
@@ -495,28 +495,30 @@
 
             const ItemTypes = { DEVICE: 'device' };
 
-            const Device = ({ device }) => {
+            const Device = ({ device, size }) => {
                 const [{ isDragging }, drag] = useDrag(() => ({
                     type: ItemTypes.DEVICE,
-                    item: { id: device.id, device, rackId: device.rack },
+                    item: { id: device.id, device, rackId: device.rack, size },
                     collect: (monitor) => ({
                         isDragging: !!monitor.isDragging(),
                     }),
                 }));
+                
+                const height = `${size * 2}rem`; // h-8 is 2rem for 1U
 
                 return (
-                    <div ref={drag} style={{ opacity: isDragging ? 0.5 : 1 }} className="p-2 bg-blue-500 text-white rounded-md cursor-move text-center text-xs">
-                        {device.hostname}
+                    <div ref={drag} style={{ opacity: isDragging ? 0.5 : 1, height }} className="p-2 bg-blue-500 text-white rounded-md cursor-move text-center text-xs flex items-center justify-center border-b border-dashed border-gray-300 dark:border-gray-700">
+                        {device.hostname} ({size}U)
                     </div>
                 );
             };
 
-            const RackSlot = ({ position, rackId, children, onDeviceMove }) => {
+            const RackSlot = ({ position, rackId, onDeviceMove, children }) => {
                 const [{ isOver }, drop] = useDrop(() => ({
                     accept: ItemTypes.DEVICE,
                     drop: (item) => {
                         if (item.rackId === rackId) {
-                            onDeviceMove(item.device, position)
+                            onDeviceMove(item.device, position);
                         } else {
                             alert("Cannot move device to a different rack!");
                         }
@@ -533,27 +535,36 @@
                 );
             };
 
-            const Rack = ({ rackName, devices, onDeviceMove }) => {
-                const slots = Array.from({ length: 42 }, (_, i) => 42 - i); // From 42 down to 1
+            const Rack = ({ rackName, devices, onDeviceMove, modelsMap }) => {
+                const slots = Array.from({ length: 42 }, (_, i) => 42 - i);
 
                 const deviceMap = new Map();
                 devices.forEach(d => {
                     const positionNumber = parseInt((d.rack_position || '').replace('U', ''), 10);
                     if (!isNaN(positionNumber)) {
-                        deviceMap.set(positionNumber, d);
+                        const model = modelsMap[d.model_id];
+                        const size = model ? parseInt(model.rack_units, 10) || 1 : 1;
+                        deviceMap.set(positionNumber, {device: d, size: size});
                     }
                 });
+
+                const renderedSlots = [];
+                for (let i = 42; i >= 1; i--) {
+                    if (deviceMap.has(i)) {
+                        const { device, size } = deviceMap.get(i);
+                        renderedSlots.push(<Device key={`device-${i}`} device={device} size={size} />);
+                        i -= (size - 1); // Skip slots covered by this device
+                    } else {
+                        renderedSlots.push(<RackSlot key={`slot-${i}`} position={`U${i}`} rackId={rackName} onDeviceMove={onDeviceMove} />);
+                    }
+                }
 
                 return (
                     <div className="bg-white dark:bg-slate-850 p-2 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800">
                         <h3 className="text-lg font-bold mb-2 text-center text-slate-700 dark:text-slate-300">{rackName}</h3>
                         <div className="flex">
                             <div className="w-full bg-slate-50 dark:bg-slate-900 rounded">
-                                {slots.map(position => (
-                                    <RackSlot key={position} position={`U${position}`} rackId={rackName} onDeviceMove={onDeviceMove}>
-                                        {deviceMap.has(position) ? <Device device={deviceMap.get(position)} /> : null}
-                                    </RackSlot>
-                                ))}
+                                {renderedSlots}
                             </div>
                         </div>
                     </div>
@@ -635,7 +646,7 @@
                                         <div className="flex overflow-x-auto gap-6 pb-4">
                                             {Object.entries(racks).map(([rackName, devices]) => (
                                                 <div key={rackName} className="flex-shrink-0" style={{width: '280px'}}>
-                                                    <Rack rackName={rackName} devices={devices} onDeviceMove={onDeviceMove}/>
+                                                    <Rack rackName={rackName} devices={devices} onDeviceMove={onDeviceMove} modelsMap={modelsMap}/>
                                                 </div>
                                             ))}
                                         </div>
@@ -687,12 +698,18 @@
         // --- GLOBAL MODALS ---
         function DeviceModal({ isOpen, onClose, onSave, options, initialData }) {
             const [form, setForm] = useState(initialData || { hostname:'', ip_address:'', serial_number:'', asset_id:'', firmware_version:'', location:'', rack:'', rack_position:'', status:'Active', type_id:'', brand_id:'', model_id:'', notes:'' });
-            useEffect(() => { setForm(initialData || { hostname:'', ip_address:'', serial_number:'', asset_id:'', firmware_version:'', location:'', rack:'', rack_position:'', status:'Active', type_id:'', brand_id:'', model_id:'', notes:'' }); }, [initialData]);
+            useEffect(() => { 
+                const initial = initialData ? { ...initialData } : { hostname:'', ip_address:'', serial_number:'', asset_id:'', firmware_version:'', location:'', rack:'', rack_position:'', status:'Active', type_id:'', brand_id:'', model_id:'', notes:'' };
+                if (initial.rack_position && typeof initial.rack_position === 'string') {
+                    initial.rack_position = parseInt(initial.rack_position.replace('U', ''), 10) || '';
+                }
+                setForm(initial); 
+            }, [initialData]);
             const brands = options?.brands || []; const models = options?.models || []; const filteredModels = models.filter(m => m.brand_id == form.brand_id);
             const handleChange = (e) => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
             const handleSelectChange = (name, value) => { setForm(prev => { if (name === 'brand_id') return { ...prev, [name]: value, model_id: '' }; return { ...prev, [name]: value }; }); };
             
-            return (<div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"><div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800"><h2 className="text-xl font-bold text-slate-800 dark:text-white">{initialData ? 'Edit Device' : 'Add New Device'}</h2><button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl">✕</button></div><form onSubmit={(e) => { e.preventDefault(); onSave(form); }} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6"><div className="col-span-1 md:col-span-2 bg-brand-50 dark:bg-brand-900/20 p-4 rounded-xl border border-brand-100 dark:border-brand-900/50"><h3 className="text-xs font-bold text-brand-700 dark:text-brand-300 uppercase tracking-wider mb-3">Core Identity</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Hostname</label><input required name="hostname" value={form.hostname} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Serial Number</label><input required name="serial_number" value={form.serial_number} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div></div></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Type</label><select required name="type_id" value={form.type_id} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800 dark:text-white"><option value="">Select Type</option>{(options.types||[]).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Status</label><select name="status" value={form.status} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800 dark:text-white"><option value="Active">Active</option><option value="In-Stock">In-Stock</option><option value="Decommissioned">Decommissioned</option></select></div><div><SearchableSelect label="Brand" options={brands} value={form.brand_id} onChange={(val)=>handleSelectChange('brand_id', val)} placeholder="Select Brand..."/></div><div><SearchableSelect label="Model" options={filteredModels} value={form.model_id} onChange={(val)=>handleSelectChange('model_id', val)} disabled={!form.brand_id} placeholder="Select Model..."/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Mgmt IP</label><input name="ip_address" value={form.ip_address||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Asset Tag</label><input name="asset_id" value={form.asset_id||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Location (Site)</label><input name="location" value={form.location||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Rack</label><input name="rack" value={form.rack} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Position</label><input name="rack_position" value={form.rack_position} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Firmware</label><input name="firmware_version" value={form.firmware_version||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div className="col-span-1 md:col-span-2"><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Notes</label><textarea name="notes" value={form.notes||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" rows="2"></textarea></div><div className="col-span-1 md:col-span-2 flex justify-end gap-3 mt-4 border-t border-slate-100 dark:border-slate-800 pt-6"><button type="button" onClick={onClose} className="px-6 py-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors">Cancel</button><button type="submit" className="px-6 py-2.5 bg-brand-600 text-white rounded-lg font-bold hover:bg-brand-700 shadow-lg shadow-brand-200 dark:shadow-none transition-all transform hover:-translate-y-0.5">Save Device</button></div></form></div></div>);
+            return (<div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"><div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800"><h2 className="text-xl font-bold text-slate-800 dark:text-white">{initialData ? 'Edit Device' : 'Add New Device'}</h2><button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl">✕</button></div><form onSubmit={(e) => { e.preventDefault(); onSave(form); }} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6"><div className="col-span-1 md:col-span-2 bg-brand-50 dark:bg-brand-900/20 p-4 rounded-xl border border-brand-100 dark:border-brand-900/50"><h3 className="text-xs font-bold text-brand-700 dark:text-brand-300 uppercase tracking-wider mb-3">Core Identity</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Hostname</label><input required name="hostname" value={form.hostname} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Serial Number</label><input required name="serial_number" value={form.serial_number} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div></div></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Type</label><select required name="type_id" value={form.type_id} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800 dark:text-white"><option value="">Select Type</option>{(options.types||[]).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Status</label><select name="status" value={form.status} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800 dark:text-white"><option value="Active">Active</option><option value="In-Stock">In-Stock</option><option value="Decommissioned">Decommissioned</option></select></div><div><SearchableSelect label="Brand" options={brands} value={form.brand_id} onChange={(val)=>handleSelectChange('brand_id', val)} placeholder="Select Brand..."/></div><div><SearchableSelect label="Model" options={filteredModels} value={form.model_id} onChange={(val)=>handleSelectChange('model_id', val)} disabled={!form.brand_id} placeholder="Select Model..."/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Mgmt IP</label><input name="ip_address" value={form.ip_address||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Asset Tag</label><input name="asset_id" value={form.asset_id||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Location (Site)</label><input name="location" value={form.location||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Rack</label><input name="rack" value={form.rack} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Position</label><input type="number" min="1" max="42" name="rack_position" value={form.rack_position} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div></div><div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Firmware</label><input name="firmware_version" value={form.firmware_version||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white"/></div><div className="col-span-1 md:col-span-2"><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Notes</label><textarea name="notes" value={form.notes||''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" rows="2"></textarea></div><div className="col-span-1 md:col-span-2 flex justify-end gap-3 mt-4 border-t border-slate-100 dark:border-slate-800 pt-6"><button type="button" onClick={onClose} className="px-6 py-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors">Cancel</button><button type="submit" className="px-6 py-2.5 bg-brand-600 text-white rounded-lg font-bold hover:bg-brand-700 shadow-lg shadow-brand-200 dark:shadow-none transition-all transform hover:-translate-y-0.5">Save Device</button></div></form></div></div>);
         }
 
         function ImportModal({ onClose, onDataUpdated }) {
@@ -777,7 +794,10 @@
             const handleSaveDevice = (formData) => {
                 if (!formData.brand_id || !formData.model_id) return alert("Please select Brand and Model.");
                 const method = formData.id ? 'put' : 'post';
-                const payload = formData;
+                const payload = {...formData}; // Create a copy to modify
+                if (payload.rack_position && !isNaN(payload.rack_position)) {
+                    payload.rack_position = 'U' + payload.rack_position;
+                }
                 axios({ method, url: 'api/inventory.php', data: payload })
                     .then(res => { 
                         if (res.data.error || res.data.message?.includes('Error')) {
@@ -805,6 +825,8 @@
 
             const dataProps = { inventory, user, options, fetchData, onEdit: (item)=>{setEditingDevice(item);setIsDeviceModalOpen(true)}, onDelete: handleDelete, onImportOpen: ()=>setIsImportOpen(true), riskFilter, setRiskFilter };
 
+            const modelsMap = useMemo(() => (options.models || []).reduce((acc, m) => { acc[m.id] = m; return acc; }, {}), [options.models]);
+
             if (!user) {
                 return (
                     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
@@ -829,7 +851,7 @@
                     <Layout user={user} currentView={view} onViewChange={handleViewChange} onLogout={handleLogout} isMenuMinimized={isMenuMinimized} setIsMenuMinimized={setIsMenuMinimized}>
                         {view === 'dashboard' && <DashboardView inventory={inventory} onNavigateToRisks={()=>{ setRiskFilter(true); setView('inventory'); }} />}
                         {view === 'inventory' && <InventoryView {...dataProps} setRawOutput={setRawOutput} setIsRawOutputModalOpen={setIsRawOutputModalOpen} />}
-                        {view === 'rack' && <RackView inventory={inventory} onDeviceMove={handleDeviceMove} />}
+                        {view === 'rack' && <RackView inventory={inventory} onDeviceMove={handleDeviceMove} modelsMap={modelsMap} />}
                         {view === 'settings' && <SettingsView options={options} onDataUpdated={fetchData} currentUser={user} />}
                         {view === 'logs' && <LogsView />}
 
