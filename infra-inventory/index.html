@@ -197,12 +197,19 @@
                 if (searchTerm) {
                     const s = searchTerm.toLowerCase();
                     items = items.filter(i => {
-                        const searchableString = [
-                            i.hostname, i.ip_address, i.serial_number, i.asset_id,
-                            i.firmware_version, i.location, i.rack, i.rack_position,
-                            i.status, i.notes, typesMap[i.type_id], i.brand, i.model
-                        ].map(val => String(val ?? '')).join(' ').toLowerCase();
-                        return searchableString.includes(s);
+                        return (i.hostname && i.hostname.toLowerCase().includes(s)) ||
+                               (i.ip_address && i.ip_address.toLowerCase().includes(s)) ||
+                               (i.serial_number && i.serial_number.toLowerCase().includes(s)) ||
+                               (i.asset_id && i.asset_id.toLowerCase().includes(s)) ||
+                               (i.firmware_version && i.firmware_version.toLowerCase().includes(s)) ||
+                               (i.location && i.location.toLowerCase().includes(s)) ||
+                               (i.rack && i.rack.toLowerCase().includes(s)) ||
+                               (i.rack_position && i.rack_position.toLowerCase().includes(s)) ||
+                               (i.status && i.status.toLowerCase().includes(s)) ||
+                               (i.notes && i.notes.toLowerCase().includes(s)) ||
+                               (i.type && i.type.toLowerCase().includes(s)) ||
+                               (i.brand && i.brand.toLowerCase().includes(s)) ||
+                               (i.model && i.model.toLowerCase().includes(s));
                     });
                 }
                 if (locationFilter) items = items.filter(i => i.location === locationFilter);
