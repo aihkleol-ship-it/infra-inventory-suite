@@ -191,6 +191,9 @@
                     });
             };
 
+            const typesMap = useMemo(() => (options.types || []).reduce((acc, t) => { acc[t.id] = t.name; return acc; }, {}), [options.types]);
+            const modelsMap = useMemo(() => (options.models || []).reduce((acc, m) => { acc[m.id] = m; return acc; }, {}), [options.models]);
+
             const processedInventory = useMemo(() => {
                 let items = [...inventory];
                 if (riskFilter) { items = items.filter(i => { const meta = getEOSMeta(i.eos_date); return meta.isRisk && i.status !== 'Decommissioned'; }); }
@@ -243,9 +246,6 @@
                 if (!brandFilter) return options.models || [];
                 return (options.models || []).filter(m => m.brand_id == brandFilter);
             }, [brandFilter, options.models]);
-
-            const typesMap = useMemo(() => (options.types || []).reduce((acc, t) => { acc[t.id] = t.name; return acc; }, {}), [options.types]);
-            const modelsMap = useMemo(() => (options.models || []).reduce((acc, m) => { acc[m.id] = m; return acc; }, {}), [options.models]);
 
             return (
                 <div className="p-8 animate-fade-in h-screen flex flex-col box-border">
