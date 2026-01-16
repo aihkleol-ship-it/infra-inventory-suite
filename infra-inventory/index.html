@@ -166,6 +166,9 @@
             const toast = useToast();
             const [searchTerm, setSearchTerm] = useState("");
             const [locationFilter, setLocationFilter] = useState("");
+            const [typeFilter, setTypeFilter] = useState("");
+            const [brandFilter, setBrandFilter] = useState("");
+            const [modelFilter, setModelFilter] = useState("");
             const [sortConfig, setSortConfig] = useState({ key: 'hostname', direction: 'ascending' });
             
             const handleSyncZabbix = () => {
@@ -191,12 +194,48 @@
             const processedInventory = useMemo(() => {
                 let items = [...inventory];
                 if (riskFilter) { items = items.filter(i => { const meta = getEOSMeta(i.eos_date); return meta.isRisk && i.status !== 'Decommissioned'; }); }
-                if (searchTerm) { const s = searchTerm.toLowerCase(); items = items.filter(i => (i.hostname.toLowerCase().includes(s) || (i.ip_address && i.ip_address.includes(s)) || (i.serial_number && i.serial_number.toLowerCase().includes(s)))); }
+                if (searchTerm) {
+                    const s = searchTerm.toLowerCase();
+                    items = items.filter(i => {
+                        const searchableString = [
+                            i.hostname, i.ip_address, i.serial_number, i.asset_id,
+                            i.firmware_version, i.location, i.rack, i.rack_position,
+                            i.status, i.notes, typesMap[i.type_id], i.brand, i.model
+                        ].join(' ').toLowerCase();
+                        return searchableString.includes(s);
+                    });
+                }
                 if (locationFilter) items = items.filter(i => i.location === locationFilter);
-                if (sortConfig.key) { items.sort((a, b) => { let valA = a[sortConfig.key] ? a[sortConfig.key].toString().toLowerCase() : ''; let valB = b[sortConfig.key] ? b[sortConfig.key].toString().toLowerCase() : ''; if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1; if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1; return 0; }); }
+                if (typeFilter) items = items.filter(i => i.type_id == typeFilter);
+                if (brandFilter) items = items.filter(i => i.brand_id == brandFilter);
+                if (modelFilter) items = items.filter(i => i.model_id == modelFilter);
+
+                if (sortConfig.key) { 
+                    items.sort((a, b) => { 
+                        let valA, valB;
+                        if (sortConfig.key === 'size') {
+                            const modelA = modelsMap[a.model_id];
+                            const modelB = modelsMap[b.model_id];
+                            valA = modelA ? modelA.rack_units : 0;
+                            valB = modelB ? modelB.rack_units : 0;
+                        } else {
+                            valA = a[sortConfig.key] ? a[sortConfig.key].toString().toLowerCase() : ''; 
+                            valB = b[sortConfig.key] ? b[sortConfig.key].toString().toLowerCase() : ''; 
+                        }
+                        if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1; 
+                        if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1; 
+                        return 0; 
+                    }); 
+                }
                 return items;
-            }, [inventory, searchTerm, locationFilter, sortConfig, riskFilter]);
+            }, [inventory, searchTerm, locationFilter, typeFilter, brandFilter, modelFilter, sortConfig, riskFilter, typesMap, modelsMap]);
+            
             const uniqueLocations = useMemo(() => [...new Set(inventory.map(i => i.location).filter(Boolean))].sort(), [inventory]);
+
+            const filteredModels = useMemo(() => {
+                if (!brandFilter) return options.models || [];
+                return (options.models || []).filter(m => m.brand_id == brandFilter);
+            }, [brandFilter, options.models]);
 
             const typesMap = useMemo(() => (options.types || []).reduce((acc, t) => { acc[t.id] = t.name; return acc; }, {}), [options.types]);
             const modelsMap = useMemo(() => (options.models || []).reduce((acc, m) => { acc[m.id] = m; return acc; }, {}), [options.models]);
@@ -213,10 +252,12 @@
                     </div>
                     {riskFilter && (<div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 rounded-xl flex items-center justify-between animate-fade-in shrink-0"><div className="flex items-center gap-3"><div className="p-2 bg-red-100 dark:bg-red-800 rounded-lg text-red-600 dark:text-red-200"><i className="ph ph-warning-circle text-lg"></i></div><div><div className="text-red-800 dark:text-red-200 text-sm font-bold">Filtered by Support Risks</div><div className="text-red-600 dark:text-red-400 text-xs">Showing active devices expired or expiring within 1.5 years.</div></div></div><button onClick={() => setRiskFilter(false)} className="text-xs bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors font-bold shadow-sm">Clear Filter</button></div>)}
                     <div className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
-                        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex gap-4 bg-white dark:bg-slate-850 items-center shrink-0">
-                            <div className="relative flex-1 max-w-md"><i className="ph ph-magnifying-glass absolute left-3.5 top-2.5 text-slate-400 dark:text-slate-500 text-lg"></i><input type="text" placeholder="Search devices..." className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:bg-slate-900 dark:text-white transition-all" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} /></div>
-                            <div className="relative w-64"><i className="ph ph-map-pin absolute left-3 top-3 text-slate-400 dark:text-slate-500"></i><select className="w-full pl-9 pr-8 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm appearance-none bg-white dark:bg-slate-900 dark:text-white focus:outline-none focus:border-brand-500" value={locationFilter} onChange={e=>setLocationFilter(e.target.value)}><option value="">All Locations</option>{uniqueLocations.map(l=><option key={l} value={l}>{l}</option>)}</select><i className="ph ph-caret-down absolute right-3 top-3 text-slate-400 pointer-events-none"></i></div>
-                            <div className="flex-1"></div>
+                        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex gap-4 bg-white dark:bg-slate-850 items-center flex-wrap shrink-0">
+                            <div className="relative flex-1" style={{minWidth: '200px'}}><i className="ph ph-magnifying-glass absolute left-3.5 top-3 text-slate-400 dark:text-slate-500 text-lg"></i><input type="text" placeholder="Search anything..." className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:bg-slate-900 dark:text-white transition-all" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} /></div>
+                            <div className="relative" style={{minWidth: '150px'}}><select className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm appearance-none bg-white dark:bg-slate-900 dark:text-white focus:outline-none focus:border-brand-500" value={typeFilter} onChange={e=>setTypeFilter(e.target.value)}><option value="">All Types</option>{(options.types||[]).map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><i className="ph ph-caret-down absolute right-3 top-3 text-slate-400 pointer-events-none"></i></div>
+                            <div className="relative" style={{minWidth: '150px'}}><select className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm appearance-none bg-white dark:bg-slate-900 dark:text-white focus:outline-none focus:border-brand-500" value={brandFilter} onChange={e=>{setBrandFilter(e.target.value); setModelFilter("");}}><option value="">All Brands</option>{(options.brands||[]).map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select><i className="ph ph-caret-down absolute right-3 top-3 text-slate-400 pointer-events-none"></i></div>
+                            <div className="relative" style={{minWidth: '150px'}}><select className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm appearance-none bg-white dark:bg-slate-900 dark:text-white focus:outline-none focus:border-brand-500" value={modelFilter} onChange={e=>setModelFilter(e.target.value)} disabled={!brandFilter}><option value="">All Models</option>{filteredModels.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select><i className="ph ph-caret-down absolute right-3 top-3 text-slate-400 pointer-events-none"></i></div>
+                            <div className="relative" style={{minWidth: '150px'}}><select className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm appearance-none bg-white dark:bg-slate-900 dark:text-white focus:outline-none focus:border-brand-500" value={locationFilter} onChange={e=>setLocationFilter(e.target.value)}><option value="">All Locations</option>{uniqueLocations.map(l=><option key={l} value={l}>{l}</option>)}</select><i className="ph ph-caret-down absolute right-3 top-3 text-slate-400 pointer-events-none"></i></div>
                             <button onClick={fetchData} className="p-2.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-xl transition-all"><i className="ph ph-arrows-clockwise text-xl"></i></button>
                         </div>
                         <div className="flex-1 overflow-auto table-container bg-white dark:bg-slate-850">
