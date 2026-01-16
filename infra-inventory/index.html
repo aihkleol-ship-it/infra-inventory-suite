@@ -223,8 +223,8 @@
                         if (sortConfig.key === 'size') {
                             const modelA = modelsMap[a.model_id];
                             const modelB = modelsMap[b.model_id];
-                            valA = modelA ? modelA.rack_units : 0;
-                            valB = modelB ? modelB.rack_units : 0;
+                            valA = modelA ? parseInt(modelA.rack_units, 10) || 0 : 0;
+                            valB = modelB ? parseInt(modelB.rack_units, 10) || 0 : 0;
                         } else {
                             valA = a[sortConfig.key] ? a[sortConfig.key].toString().toLowerCase() : ''; 
                             valB = b[sortConfig.key] ? b[sortConfig.key].toString().toLowerCase() : ''; 
