@@ -817,6 +817,43 @@
             
             const handleSaveDevice = (formData) => {
                 if (!formData.brand_id || !formData.model_id) return alert("Please select Brand and Model.");
+
+                const model = options.models.find(m => m.id == formData.model_id);
+                const rackUnits = model ? parseInt(model.rack_units, 10) || 1 : 1;
+                const rackPosition = formData.rack_position ? parseInt(formData.rack_position, 10) : 0;
+
+                if (rackPosition) {
+                    if (rackUnits > 1 && rackPosition < rackUnits) {
+                        return alert(`A ${rackUnits}U device cannot be placed at position U${rackPosition}. The lowest possible position for this device is U${rackUnits}.`);
+                    }
+
+                    // Check for collision with other devices
+                    const devicesInRack = inventory.filter(d =>
+                        d.location === formData.location &&
+                        d.rack === formData.rack &&
+                        d.id !== formData.id // Exclude the device being edited
+                    );
+
+                    const deviceMap = new Map();
+                    devicesInRack.forEach(d => {
+                        const pos = parseInt((d.rack_position || '').replace('U', ''), 10);
+                        if (!isNaN(pos)) {
+                            const m = options.models.find(model => model.id === d.model_id);
+                            const size = m ? parseInt(m.rack_units, 10) || 1 : 1;
+                            for (let i = 0; i < size; i++) {
+                                deviceMap.set(pos - i, d.hostname);
+                            }
+                        }
+                    });
+
+                    for (let i = 0; i < rackUnits; i++) {
+                        const targetSlot = rackPosition - i;
+                        if (deviceMap.has(targetSlot)) {
+                            return alert(`Position U${rackPosition} for this ${rackUnits}U device is blocked by device "${deviceMap.get(targetSlot)}" which occupies U${targetSlot}.`);
+                        }
+                    }
+                }
+
                 const method = formData.id ? 'put' : 'post';
                 const payload = {...formData}; // Create a copy to modify
                 if (payload.rack_position && !isNaN(payload.rack_position)) {
