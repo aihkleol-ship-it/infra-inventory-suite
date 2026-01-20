@@ -62,10 +62,6 @@ try {
     switch ($method) {
         case 'GET':
             // --- Parameters ---
-            $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 1000;
-            $offset = ($page - 1) * $limit;
-            
             $search = $_GET['search'] ?? '';
             $sortBy = $_GET['sortBy'] ?? 'i.hostname';
             $sortOrder = isset($_GET['sortOrder']) && strtolower($_GET['sortOrder']) === 'desc' ? 'DESC' : 'ASC';
@@ -79,7 +75,7 @@ try {
             $params = [];
 
             if (!empty($search)) {
-                $where_sql = " WHERE (i.hostname LIKE :search OR i.serial_number LIKE :search OR i.ip_address LIKE :search OR i.location LIKE :search OR i.notes LIKE :search)";
+                $where_sql = " WHERE (LOWER(i.hostname) LIKE LOWER(:search) OR LOWER(i.serial_number) LIKE LOWER(:search) OR LOWER(i.ip_address) LIKE LOWER(:search) OR LOWER(i.location) LIKE LOWER(:search) OR LOWER(i.notes) LIKE LOWER(:search))";
                 $params[':search'] = "%$search%";
             }
 
@@ -89,25 +85,16 @@ try {
             $total_count = $count_stmt->fetchColumn();
 
             // --- Data Fetch ---
-            $limit_sql = '';
-            if ($limit !== -1) {
-                $limit_sql = " LIMIT :limit OFFSET :offset";
-            }
-            
-            $data_sql = "SELECT i.id, i.hostname, i.ip_address, i.serial_number, i.asset_id, i.firmware_version, i.location, i.sub_location, i.rack, i.rack_position, i.status, i.notes, i.type_id, i.brand_id, i.model_id, dt.name as type, b.name as brand, m.name as model, m.eos_date " . $base_sql . $where_sql . " ORDER BY $sortBy $sortOrder" . $limit_sql;
-            
-            $stmt = $pdo->prepare($data_sql);
-            
-            if ($limit !== -1) {
-                $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
-                $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
-            }
-            if (!empty($search)) {
-                $stmt->bindParam(':search', $params[':search']);
-            }
-            $stmt->execute();
-            
-            json_response(200, $stmt->fetchAll(PDO::FETCH_ASSOC), ['X-Total-Count' => $total_count]);
+                        $data_sql = "SELECT i.id, i.hostname, i.ip_address, i.serial_number, i.asset_id, i.firmware_version, i.location, i.sub_location, i.rack, i.rack_position, i.status, i.notes, i.type_id, i.brand_id, i.model_id, dt.name as type, b.name as brand, m.name as model, m.eos_date " . $base_sql . $where_sql . " ORDER BY $sortBy $sortOrder";
+                        
+                        $stmt = $pdo->prepare($data_sql);
+                        
+                        if (!empty($search)) {
+                            $stmt->bindParam(':search', $params[':search']);
+                        }
+                        $stmt->execute();
+                        
+                        json_response(200, $stmt->fetchAll(PDO::FETCH_ASSOC), ['X-Total-Count' => $total_count]);
             break;
 
         case 'POST':
