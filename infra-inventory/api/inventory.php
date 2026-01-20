@@ -63,7 +63,7 @@ try {
         case 'GET':
             // --- Parameters ---
             $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 20;
+            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 1000;
             $offset = ($page - 1) * $limit;
             
             $search = $_GET['search'] ?? '';
