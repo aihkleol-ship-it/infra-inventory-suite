@@ -5,12 +5,6 @@ include_once 'logger.php';
 
 // --- Helper Functions ---
 
-/**
- * Sends a JSON response with a specific HTTP status code and optional headers.
- * @param int $statusCode
- * @param array $data
- * @param array $headers
- */
 function json_response(int $statusCode, array $data, array $headers = []): void {
     foreach ($headers as $key => $value) {
         header("$key: $value");
@@ -20,12 +14,6 @@ function json_response(int $statusCode, array $data, array $headers = []): void 
     exit;
 }
 
-/**
- * Validates and prepares inventory data from the input array.
- * @param array $input
- * @param bool $is_update
- * @return array
- */
 function get_and_validate_inventory_data(array $input, bool $is_update = false): array {
     $errors = [];
 
@@ -36,7 +24,7 @@ function get_and_validate_inventory_data(array $input, bool $is_update = false):
     }
     
     foreach (['type_id', 'brand_id', 'model_id'] as $field) {
-        if (isset($input[$field]) && !filter_var($input[$field], FILTER_VALIDATE_INT)) {
+        if (isset($input[$field]) && !is_null($input[$field]) && !filter_var($input[$field], FILTER_VALIDATE_INT)) {
             $errors[] = "Invalid value for {$field}. Must be an integer.";
         }
     }
@@ -52,20 +40,12 @@ function get_and_validate_inventory_data(array $input, bool $is_update = false):
     }
 
     return [
-        ':hostname' => $input['hostname'],
-        ':ip' => $input['ip_address'] ?? null,
-        ':serial' => $input['serial_number'],
-        ':asset' => $input['asset_id'] ?? null,
-        ':fw' => $input['firmware_version'] ?? null,
-        ':loc' => $input['location'] ?? null,
-        ':sub' => $input['sub_location'] ?? null,
-        ':rack' => $input['rack'] ?? null,
-        ':rack_pos' => $input['rack_position'] ?? null,
-        ':status' => $input['status'] ?? 'Active',
-        ':type' => $input['type_id'] ?? null,
-        ':brand' => $input['brand_id'] ?? null,
-        ':model' => $input['model_id'] ?? null,
-        ':notes' => $input['notes'] ?? null
+        ':hostname' => $input['hostname'], ':ip' => $input['ip_address'] ?? null, ':serial' => $input['serial_number'],
+        ':asset' => $input['asset_id'] ?? null, ':fw' => $input['firmware_version'] ?? null, 
+        ':loc' => $input['location'] ?? null, ':sub' => $input['sub_location'] ?? null,
+        ':rack' => $input['rack'] ?? null, ':rack_pos' => $input['rack_position'] ?? null,
+        ':status' => $input['status'] ?? 'Active', ':type' => $input['type_id'] ?? null, 
+        ':brand' => $input['brand_id'] ?? null, ':model' => $input['model_id'] ?? null, ':notes' => $input['notes'] ?? null
     ];
 }
 
@@ -81,62 +61,72 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'viewer' && $method !== 'G
 try {
     switch ($method) {
         case 'GET':
+            // --- Parameters ---
             $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
             $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 20;
             $offset = ($page - 1) * $limit;
+            
+            $search = $_GET['search'] ?? '';
+            $sortBy = $_GET['sortBy'] ?? 'i.hostname';
+            $sortOrder = isset($_GET['sortOrder']) && strtolower($_GET['sortOrder']) === 'desc' ? 'DESC' : 'ASC';
+            
+            $allowed_sort_columns = ['i.hostname', 'i.ip_address', 'i.serial_number', 'i.location', 'i.status', 'b.name', 'm.name', 'dt.name'];
+            if (!in_array($sortBy, $allowed_sort_columns)) { $sortBy = 'i.hostname'; }
 
-            // Get total count
-            $count_stmt = $pdo->query("SELECT COUNT(*) FROM inventory");
+            // --- Query Building ---
+            $base_sql = "FROM inventory i LEFT JOIN device_types dt ON i.type_id = dt.id LEFT JOIN brands b ON i.brand_id = b.id LEFT JOIN models m ON i.model_id = m.id";
+            $where_sql = '';
+            $params = [];
+
+            if (!empty($search)) {
+                $where_sql = " WHERE (i.hostname LIKE :search OR i.serial_number LIKE :search OR i.ip_address LIKE :search OR i.location LIKE :search OR i.notes LIKE :search)";
+                $params[':search'] = "%$search%";
+            }
+
+            // --- Total Count ---
+            $count_stmt = $pdo->prepare("SELECT COUNT(i.id) " . $base_sql . $where_sql);
+            $count_stmt->execute($params);
             $total_count = $count_stmt->fetchColumn();
 
-            $sql = "SELECT 
-                        i.id, i.hostname, i.ip_address, i.serial_number, 
-                        i.asset_id, i.firmware_version, i.location, i.sub_location, i.rack, i.rack_position, i.status, i.notes,
-                        i.type_id, i.brand_id, i.model_id, 
-                        dt.name as type, b.name as brand, m.name as model, m.eos_date
-                    FROM inventory i
-                    LEFT JOIN device_types dt ON i.type_id = dt.id
-                    LEFT JOIN brands b ON i.brand_id = b.id
-                    LEFT JOIN models m ON i.model_id = m.id
-                    ORDER BY i.hostname ASC
-                    LIMIT :limit OFFSET :offset";
+            // --- Data Fetch ---
+            $limit_sql = '';
+            if ($limit !== -1) {
+                $limit_sql = " LIMIT :limit OFFSET :offset";
+            }
             
-            $stmt = $pdo->prepare($sql);
-            $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+            $data_sql = "SELECT i.id, i.hostname, i.ip_address, i.serial_number, i.asset_id, i.firmware_version, i.location, i.sub_location, i.rack, i.rack_position, i.status, i.notes, i.type_id, i.brand_id, i.model_id, dt.name as type, b.name as brand, m.name as model, m.eos_date " . $base_sql . $where_sql . " ORDER BY $sortBy $sortOrder" . $limit_sql;
+            
+            $stmt = $pdo->prepare($data_sql);
+            
+            if ($limit !== -1) {
+                $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+                $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+            }
+            if (!empty($search)) {
+                $stmt->bindParam(':search', $params[':search']);
+            }
             $stmt->execute();
-
+            
             json_response(200, $stmt->fetchAll(PDO::FETCH_ASSOC), ['X-Total-Count' => $total_count]);
             break;
 
         case 'POST':
+            // ... (rest of the cases are unchanged)
             $data = get_and_validate_inventory_data($input);
-            $sql = "INSERT INTO inventory 
-                    (hostname, ip_address, serial_number, asset_id, firmware_version, location, sub_location, rack, rack_position, status, type_id, brand_id, model_id, notes)
-                    VALUES (:hostname, :ip, :serial, :asset, :fw, :loc, :sub, :rack, :rack_pos, :status, :type, :brand, :model, :notes)";
-            
+            $sql = "INSERT INTO inventory (hostname, ip_address, serial_number, asset_id, firmware_version, location, sub_location, rack, rack_position, status, type_id, brand_id, model_id, notes) VALUES (:hostname, :ip, :serial, :asset, :fw, :loc, :sub, :rack, :rack_pos, :status, :type, :brand, :model, :notes)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute($data);
-
             writeLog($pdo, 'CREATE', "Device: " . $input['hostname'], "Serial: " . $input['serial_number']);
             json_response(201, ["message" => "Device added successfully", "id" => $pdo->lastInsertId()]);
             break;
 
         case 'PUT':
             $data = get_and_validate_inventory_data($input, true);
-            $sql = "UPDATE inventory SET 
-                    hostname = :hostname, ip_address = :ip, serial_number = :serial, asset_id = :asset, 
-                    firmware_version = :fw, location = :loc, sub_location = :sub, rack = :rack, rack_position = :rack_pos, status = :status, 
-                    type_id = :type, brand_id = :brand, model_id = :model, notes = :notes,
-                    updated_at = NOW()
-                    WHERE id = :id";
-            
+            $sql = "UPDATE inventory SET hostname = :hostname, ip_address = :ip, serial_number = :serial, asset_id = :asset, firmware_version = :fw, location = :loc, sub_location = :sub, rack = :rack, rack_position = :rack_pos, status = :status, type_id = :type, brand_id = :brand, model_id = :model, notes = :notes, updated_at = NOW() WHERE id = :id";
             $data[':id'] = $input['id'];
-
             $stmt = $pdo->prepare($sql);
             $stmt->execute($data);
-
-            writeLog($pdo, 'UPDATE', "Device: " . ($input['hostname'] ?? 'N/A'), "Updated details via dashboard for ID: " . $input['id']);
+            writeLog($pdo, 'UPDATE', "Device: " . ($input['hostname'] ?? 'N/A'), "Updated details for ID: " . $input['id']);
             json_response(200, ["message" => "Device updated successfully"]);
             break;
 
@@ -145,14 +135,11 @@ try {
                 json_response(400, ["message" => "A valid ID is required for deletion."]);
             }
             $id = $input['id'];
-
             $check = $pdo->prepare("SELECT hostname, serial_number FROM inventory WHERE id = ?");
             $check->execute([$id]);
             $item = $check->fetch(PDO::FETCH_ASSOC);
-
             $stmt = $pdo->prepare("DELETE FROM inventory WHERE id = ?");
             $stmt->execute([$id]);
-
             if ($item) {
                 writeLog($pdo, 'DELETE', "Device: " . $item['hostname'], "Serial: " . $item['serial_number']);
             }
@@ -164,7 +151,7 @@ try {
             break;
     }
 } catch (PDOException $e) {
-    if ($e->getCode() == 23000) { // Integrity constraint violation (e.g., duplicate serial number)
+    if ($e->getCode() == 23000) {
         json_response(409, ["message" => "Error: A record with this value (e.g., serial number) already exists."]);
     } else {
         json_response(500, ["message" => "Database Error: " . $e->getMessage()]);
