@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetView SLG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        /* Custom scrollbar for dark mode */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+        .vis-tooltip {
+            background-color: #1f2937 !important;
+            border: 1px solid #4b5563 !important;
+            color: #f3f4f6 !important;
+            padding: 8px !important;
+            border-radius: 6px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+        }
+        .resize-handle {
+            cursor: col-resize;
+            width: 8px;
+            background-color: #4b5563;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            z-index: 10;
+        }
+        .resize-handle:hover {
+            background-color: #6b7280;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans">
+
+    <div id="app" class="flex flex-col h-screen">
+        <!-- Header -->
+        <header class="bg-gray-800 shadow-lg z-10 p-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-amber-400">NetView SLG</h1>
+            <div class="flex items-center space-x-4">
+                <label for="file-upload" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm transition-all duration-300 hover:scale-105">
+                    Load Configs
+                </label>
+                <input id="file-upload" type="file" multiple class="hidden">
+                <button id="import-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm transition-all duration-300 hover:scale-105">Import Project</button>
+                <button id="export-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm transition-all duration-300 hover:scale-105">Export Project</button>
+                <button id="clear-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm transition-all duration-300 hover:scale-105">Clear Session</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow flex">
+            <!-- Sidebar -->
+            <aside id="sidebar" class="relative bg-gray-800 p-4 overflow-y-auto" style="width: 25%;">
+                <div id="resize-handle" class="resize-handle"></div>
+                <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">Device Inventory</h2>
+                <div id="device-list" class="space-y-2">
+                    <!-- Device items will be injected here -->
+                </div>
+            </aside>
+
+            <!-- Network Diagram -->
+            <div id="network-diagram" class="flex-grow bg-gray-900"></div>
+        </main>
+    </div>
+
+    <script>
+        const AppState = {
+            devices: [],
+            visNetwork: null
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+        });
+
+        function initApp() {
+            // Load data from localStorage if available
+            loadState();
+
+            // Setup event listeners
+            document.getElementById('file-upload').addEventListener('change', handleFileLoad);
+            document.getElementById('import-btn').addEventListener('click', () => document.getElementById('project-import-input').click());
+            document.getElementById('export-btn').addEventListener('click', exportProject);
+            document.getElementById('clear-btn').addEventListener('click', clearSession);
+
+            // Create a hidden file input for project import
+            const projectImportInput = document.createElement('input');
+            projectImportInput.type = 'file';
+            projectImportInput.id = 'project-import-input';
+            projectImportInput.accept = '.json';
+            projectImportInput.style.display = 'none';
+            projectImportInput.addEventListener('change', handleProjectImport);
+            document.body.appendChild(projectImportInput);
+
+
+            // Initial render
+            renderUI();
+            initResize();
+        }
+
+        function initResize() {
+            const sidebar = document.getElementById('sidebar');
+            const resizeHandle = document.getElementById('resize-handle');
+            let isResizing = false;
+
+            resizeHandle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', () => {
+                    isResizing = false;
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    // Optional: Save sidebar width to localStorage
+                });
+            });
+
+            function handleMouseMove(e) {
+                if (!isResizing) return;
+                const sidebarWidth = e.clientX;
+                if (sidebarWidth > 200 && sidebarWidth < window.innerWidth - 200) { // Min and max width
+                    sidebar.style.width = `${sidebarWidth}px`;
+                    if(AppState.visNetwork) {
+                        AppState.visNetwork.redraw();
+                    }
+                }
+            }
+        }
+
+        function handleProjectImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedDevices = JSON.parse(e.target.result);
+                    if (Array.isArray(importedDevices)) {
+                        AppState.devices = importedDevices;
+                        saveState();
+                        renderUI();
+                    } else {
+                        alert('Invalid project file format.');
+                    }
+                } catch (error) {
+                    alert('Error parsing project file.');
+                    console.error(error);
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        function parseConfig(rawContent, filename) {
+            const lines = rawContent.split('\n');
+            const device = {
+                id: `dev_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                filename: filename,
+                hostname: 'Unknown',
+                type: 'Switch', // Default type
+                createdAt: new Date().toISOString(),
+                raw: rawContent,
+                interfaces: []
+            };
+
+            // Hostname Extraction
+            const hostnameRegex = /^\s*hostname\s+([^\s]+)/i;
+            for (const line of lines) {
+                const match = line.match(hostnameRegex);
+                if (match) {
+                    device.hostname = match[1];
+                    break;
+                }
+            }
+
+            // Device Type Detection
+            if (device.hostname.toLowerCase().includes('fw') || device.hostname.toLowerCase().includes('asa')) {
+                device.type = 'Firewall';
+            } else if (device.hostname.toLowerCase().includes('wlc')) {
+                device.type = 'WLC';
+            }
+
+            // Interface Parsing
+            let currentInterface = null;
+            const interfaceRegex = /^\s*interface\s+(.+)/i;
+            const ipRegex = /^\s*ip\s+address\s+([\d\.]+)\s+([\d\.]+)/i;
+            const descRegex = /^\s*description\s+(.+)/i;
+            const shutdownRegex = /^\s*shutdown/i;
+
+            for (const line of lines) {
+                const interfaceMatch = line.match(interfaceRegex);
+                if (interfaceMatch) {
+                    if (currentInterface) {
+                        device.interfaces.push(currentInterface);
+                    }
+                    currentInterface = {
+                        name: interfaceMatch[1].trim(),
+                        ip: null,
+                        mask: null,
+                        desc: '',
+                        shutdown: false
+                    };
+                } else if (currentInterface) {
+                    const ipMatch = line.match(ipRegex);
+                    if (ipMatch) {
+                        currentInterface.ip = ipMatch[1];
+                        currentInterface.mask = ipMatch[2];
+                    }
+
+                    const descMatch = line.match(descRegex);
+                    if (descMatch) {
+                        currentInterface.desc = descMatch[1].trim();
+                    }
+
+                    if (shutdownRegex.test(line)) {
+                        currentInterface.shutdown = true;
+                    }
+                }
+            }
+            if (currentInterface) {
+                device.interfaces.push(currentInterface);
+            }
+
+            return device;
+        }
+
+        function renderUI() {
+            renderDeviceList();
+            renderNetworkDiagram();
+        }
+
+        function renderDeviceList() {
+            const deviceListEl = document.getElementById('device-list');
+            deviceListEl.innerHTML = ''; // Clear existing list
+
+            if (AppState.devices.length === 0) {
+                deviceListEl.innerHTML = `<p class="text-gray-500">No devices loaded.</p>`;
+                return;
+            }
+
+            AppState.devices.forEach(device => {
+                const deviceEl = document.createElement('div');
+                deviceEl.className = 'bg-gray-700 p-3 rounded-lg shadow';
+                deviceEl.innerHTML = `
+                    <h3 class="font-bold text-lg text-amber-300">${device.hostname}</h3>
+                    <p class="text-sm text-gray-400">${device.type} | ${device.filename}</p>
+                    <p class="text-xs text-gray-500 mt-1">${device.interfaces.length} interfaces</p>
+                `;
+                deviceListEl.appendChild(deviceEl);
+            });
+        }
+
+        function getDeviceColor(device) {
+            const hostname = device.hostname.toLowerCase();
+            if (hostname.includes('core') || hostname.includes('hq')) {
+                return '#3b82f6'; // Royal Blue
+            }
+            switch (device.type) {
+                case 'Firewall': return '#ef4444'; // Red
+                case 'WLC': return '#10b981'; // Emerald
+                case 'Switch':
+                default:
+                     return '#f59e0b'; // Amber/Gold
+            }
+        }
+
+        function renderNetworkDiagram() {
+            const container = document.getElementById('network-diagram');
+            const nodes = new vis.DataSet(AppState.devices.map(device => ({
+                id: device.id,
+                label: device.hostname,
+                shape: 'hexagon',
+                color: getDeviceColor(device),
+                font: { color: 'white' }
+            })));
+
+            const edges = new vis.DataSet(generateEdges());
+
+            const data = { nodes, edges };
+            const options = {
+                physics: {
+                    barnesHut: {
+                        gravitationalConstant: -12000,
+                        centralGravity: 0.3,
+                        springLength: 200,
+                        springConstant: 0.04,
+                        damping: 0.09,
+                        avoidOverlap: 1
+                    }
+                },
+                nodes: {
+                    borderWidth: 2,
+                    size: 50,
+                    font: {
+                        size: 14,
+                        face: 'Segoe UI',
+                        strokeWidth: 3,
+                        strokeColor: '#2d3748'
+                    }
+                },
+                edges: {
+                    width: 3,
+                    color: {
+                        color: '#4b5563',
+                        highlight: '#6b7280'
+                    },
+                    font: {
+                        color: 'white',
+                        strokeWidth: 0,
+                        background: '#4b5563'
+                    }
+                },
+                interaction: {
+                    tooltipDelay: 200,
+                    hover: true
+                }
+            };
+
+            AppState.visNetwork = new vis.Network(container, data, options);
+        }
+
+        function generateEdges() {
+            const edges = [];
+            const devices = AppState.devices;
+
+            if (devices.length < 2) return edges;
+
+            // Heuristic 1: Layer 3 Subnet Matching
+            for (let i = 0; i < devices.length; i++) {
+                for (let j = i + 1; j < devices.length; j++) {
+                    const devA = devices[i];
+                    const devB = devices[j];
+
+                    for (const ifaceA of devA.interfaces) {
+                        if (!ifaceA.ip || !ifaceA.mask) continue;
+
+                        for (const ifaceB of devB.interfaces) {
+                            if (!ifaceB.ip || !ifaceB.mask) continue;
+                            
+                            if (ifaceA.mask === ifaceB.mask) {
+                                const netA = ipToDecimal(ifaceA.ip) & ipToDecimal(ifaceA.mask);
+                                const netB = ipToDecimal(ifaceB.ip) & ipToDecimal(ifaceB.mask);
+
+                                if (netA === netB) {
+                                    edges.push({
+                                        from: devA.id,
+                                        to: devB.id,
+                                        label: `L3: ${ifaceA.name} <-> ${ifaceB.name}`,
+                                        title: `Subnet Match: ${decimalToIp(netA)}/${ifaceA.mask}`
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Heuristic 2: Layer 1/2 Description Matching
+            for (let i = 0; i < devices.length; i++) {
+                for (let j = i + 1; j < devices.length; j++) {
+                    const devA = devices[i];
+                    const devB = devices[j];
+
+                    for (const ifaceA of devA.interfaces) {
+                        if (ifaceA.desc && ifaceA.desc.toLowerCase().includes(devB.hostname.toLowerCase())) {
+                             edges.push({
+                                from: devA.id,
+                                to: devB.id,
+                                label: `L2: ${ifaceA.name} -> ${devB.hostname}`,
+                                title: `Description Match: "${ifaceA.desc}"`
+                            });
+                        }
+                    }
+                    for (const ifaceB of devB.interfaces) {
+                        if (ifaceB.desc && ifaceB.desc.toLowerCase().includes(devA.hostname.toLowerCase())) {
+                             edges.push({
+                                from: devB.id,
+                                to: devA.id,
+                                label: `L2: ${ifaceB.name} -> ${devA.hostname}`,
+                                title: `Description Match: "${ifaceB.desc}"`
+                            });
+                        }
+                    }
+                }
+            }
+            return edges;
+        }
+
+        function ipToDecimal(ip) {
+            return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0);
+        }
+
+        function decimalToIp(decimal) {
+            return [
+                (decimal >> 24) & 255,
+                (decimal >> 16) & 255,
+                (decimal >> 8) & 255,
+                decimal & 255
+            ].join('.');
+        }
+
+
+        function handleFileLoad(event) {
+            const files = event.target.files;
+            if (files.length === 0) return;
+
+            const promises = Array.from(files).map(file => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const device = parseConfig(e.target.result, file.name);
+                        AppState.devices.push(device);
+                        resolve();
+                    };
+                    reader.onerror = reject;
+                    reader.readAsText(file);
+                });
+            });
+
+            Promise.all(promises).then(() => {
+                saveState();
+                renderUI();
+            });
+        }
+
+        function exportProject() {
+            if (AppState.devices.length === 0) {
+                alert("No data to export.");
+                return;
+            }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(AppState.devices, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "netview_project.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function clearSession() {
+            if (confirm("Are you sure you want to clear all loaded devices and the diagram?")) {
+                localStorage.removeItem('netViewState');
+                AppState.devices = [];
+                renderUI();
+            }
+        }
+
+        function saveState() {
+            localStorage.setItem('netViewState', JSON.stringify(AppState.devices));
+        }
+
+        function loadState() {
+            const savedState = localStorage.getItem('netViewState');
+            if (savedState) {
+                AppState.devices = JSON.parse(savedState);
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+</body>
+</html>
