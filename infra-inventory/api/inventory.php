@@ -111,7 +111,6 @@ try {
             break;
 
         case 'POST':
-            // ... (rest of the cases are unchanged)
             $data = get_and_validate_inventory_data($input);
             $sql = "INSERT INTO inventory (hostname, ip_address, serial_number, asset_id, firmware_version, location, sub_location, rack, rack_position, status, type_id, brand_id, model_id, notes) VALUES (:hostname, :ip, :serial, :asset, :fw, :loc, :sub, :rack, :rack_pos, :status, :type, :brand, :model, :notes)";
             $stmt = $pdo->prepare($sql);
