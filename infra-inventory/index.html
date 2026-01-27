@@ -685,10 +685,11 @@
 
 
         // --- DATALINE VIEW ---
-        function DatalineView() {
+        function DatalineView({ onEdit }) {
             const [data, setData] = useState([]);
             const [loading, setLoading] = useState(true);
             const [isImportOpen, setIsImportOpen] = useState(false);
+            const toast = useToast();
 
             useEffect(() => {
                 fetchDatalineData();
@@ -704,17 +705,22 @@
                     .catch(error => {
                         console.error('Error fetching dataline data:', error);
                         setLoading(false);
+                        toast('Failed to fetch dataline data', 'error');
                     });
-            }
-
-            // Placeholder functions for actions
-            function editRecord(id) {
-                alert('Editing record: ' + id);
             }
 
             function deleteRecord(id) {
                 if (confirm('Are you sure you want to delete record ' + id + '?')) {
-                    alert('Deleting record: ' + id);
+                    axios.delete('api/dataline.php', { data: { id: id } })
+                        .then(res => {
+                            if (res.data.success) {
+                                toast('Record deleted', 'success');
+                                fetchDatalineData();
+                            } else {
+                                toast(res.data.message || 'Deletion failed', 'error');
+                            }
+                        })
+                        .catch(err => toast(err.response?.data?.message || 'Deletion failed', 'error'));
                 }
             }
             
@@ -729,7 +735,7 @@
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => setIsImportOpen(true)} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 text-sm font-bold hover:border-brand-200 dark:hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 transition-all"><i className="ph ph-upload-simple text-lg"></i> Import</button>
-                            <button className="bg-brand-600 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-brand-200 dark:shadow-none flex items-center gap-2 text-sm font-bold hover:bg-brand-700 transition-all transform hover:-translate-y-0.5">
+                            <button onClick={() => onEdit(null)} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-brand-200 dark:shadow-none flex items-center gap-2 text-sm font-bold hover:bg-brand-700 transition-all transform hover:-translate-y-0.5">
                                 <i className="ph ph-plus text-lg"></i> Add Dataline
                             </button>
                         </div>
@@ -766,7 +772,7 @@
                                             <td className="px-6 py-3.5">{row.contract_status}</td>
                                             <td className="px-6 py-3.5 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => editRecord(row.id)} className="p-2 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"><i className="ph ph-pencil-simple"></i></button>
+                                                    <button onClick={() => onEdit(row)} className="p-2 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"><i className="ph ph-pencil-simple"></i></button>
                                                     <button onClick={() => deleteRecord(row.id)} className="p-2 text-slate-400 hover:text-red-500 dark:hover:text-red-400"><i className="ph ph-trash"></i></button>
                                                 </div>
                                             </td>
@@ -884,23 +890,88 @@
             );
         }
 
+        function DatalineModal({ isOpen, onClose, onSave, initialData }) {
+            const [form, setForm] = useState(initialData || {});
+            
+            useEffect(() => {
+                setForm(initialData || { site: '', usage_type: '', bandwidth: '', end_device: '', end_device_mgmt_ip: '', wan_ip: '', wan_ip_count: '', gateway: '', service_provider: '', circuit_id: '', circuit_description: '', installation_address: '', account_number: '', account_name: '', monthly_charge_hkd: '', contract_end_date: '', contract_status: '' });
+            }, [initialData]);
+
+            const handleChange = (e) => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white">{initialData ? 'Edit Dataline' : 'Add New Dataline'}</h2>
+                            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl">✕</button>
+                        </div>
+                        <form onSubmit={(e) => { e.preventDefault(); onSave(form); }} className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* Left Column */}
+                            <div className="md:col-span-1 space-y-4">
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Site</label><input name="site" value={form.site || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Usage Type</label><input name="usage_type" value={form.usage_type || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Bandwidth</label><input name="bandwidth" value={form.bandwidth || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">End Device</label><input name="end_device" value={form.end_device || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">End Device Mgmt IP</label><input name="end_device_mgmt_ip" value={form.end_device_mgmt_ip || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                            </div>
+                            {/* Middle Column */}
+                            <div className="md:col-span-1 space-y-4">
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">WAN IP</label><input name="wan_ip" value={form.wan_ip || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">WAN IP Count</label><input name="wan_ip_count" value={form.wan_ip_count || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Gateway</label><input name="gateway" value={form.gateway || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Service Provider</label><input name="service_provider" value={form.service_provider || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Circuit ID</label><input required name="circuit_id" value={form.circuit_id || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                            </div>
+                            {/* Right Column */}
+                            <div className="md:col-span-1 space-y-4">
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Account Number</label><input name="account_number" value={form.account_number || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Account Name</label><input name="account_name" value={form.account_name || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Monthly Charge (HKD)</label><input name="monthly_charge_hkd" value={form.monthly_charge_hkd || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Contract End Date</label><input type="date" name="contract_end_date" value={form.contract_end_date || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Contract Status</label><input name="contract_status" value={form.contract_status || ''} onChange={handleChange} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" /></div>
+                            </div>
+                            {/* Bottom */}
+                            <div className="md:col-span-3">
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Circuit Description</label>
+                                <textarea name="circuit_description" value={form.circuit_description || ''} onChange={handleChange} rows="3" className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" />
+                            </div>
+                             <div className="md:col-span-3">
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Installation Address</label>
+                                <textarea name="installation_address" value={form.installation_address || ''} onChange={handleChange} rows="3" className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none dark:bg-slate-800 dark:text-white" />
+                            </div>
+
+                            <div className="md:col-span-3 border-t border-slate-100 dark:border-slate-800 pt-6 flex justify-end gap-3">
+                                <button type="button" onClick={onClose} className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-700">Cancel</button>
+                                <button type="submit" className="bg-brand-600 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-brand-700">{initialData ? 'Update Dataline' : 'Add Dataline'}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
         function App() {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('dashboard');
             const [inventory, setInventory] = useState([]);
             const [options, setOptions] = useState({ brands: [], types: [], models: [] });
             const [loading, setLoading] = useState(true);
-            const [searchTerm, setSearchTerm] = useState("");
-            const [locationFilter, setLocationFilter] = useState("");
-            const [sortConfig, setSortConfig] = useState({ key: 'hostname', direction: 'ascending' });
             const [isMenuMinimized, setIsMenuMinimized] = useState(false);
             
             const [isImportOpen, setIsImportOpen] = useState(false);
             const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
             const [editingDevice, setEditingDevice] = useState(null);
+            
+            const [isDatalineModalOpen, setIsDatalineModalOpen] = useState(false);
+            const [editingDataline, setEditingDataline] = useState(null);
+
             const [riskFilter, setRiskFilter] = useState(false);
             const [isRawOutputModalOpen, setIsRawOutputModalOpen] = useState(false);
             const [rawOutput, setRawOutput] = useState("");
+            const toast = useToast();
 
             useEffect(() => { if (user) fetchData(); }, [user]);
 
@@ -909,6 +980,27 @@
                 Promise.all([axios.get('api/inventory.php'), axios.get('api/options.php')])
                 .then(([invRes, optRes]) => { setInventory(Array.isArray(invRes.data) ? invRes.data : []); setOptions(optRes.data || { brands: [], types: [], models: [] }); setLoading(false); })
                 .catch(err => { console.error(err); setLoading(false); });
+            };
+            
+            const handleSaveDataline = (formData) => {
+                const method = formData.id ? 'put' : 'post';
+                axios({ method, url: 'api/dataline.php', data: formData })
+                    .then(res => {
+                        if (res.data.success) {
+                            toast(formData.id ? 'Dataline updated' : 'Dataline added', 'success');
+                            setIsDatalineModalOpen(false);
+                            // A simple way to refresh data in DatalineView is to reload the page.
+                            // A more advanced approach would involve a shared state management or callbacks.
+                            if (view === 'dataline') {
+                                // This is a bit of a hack, forcing a reload of the view.
+                                // A better implementation would have a dedicated fetch function for dataline passed down.
+                                 window.location.reload();
+                            }
+                        } else {
+                            toast(res.data.message || 'Save failed', 'error');
+                        }
+                    })
+                    .catch(err => toast(err.response?.data?.message || 'Save failed', 'error'));
             };
 
             const handleLogout = () => { axios.get('api/logout.php').then(() => setUser(null)); };
@@ -1011,12 +1103,13 @@
                         {view === 'dashboard' && <DashboardView inventory={inventory} onNavigateToRisks={()=>{ setRiskFilter(true); setView('inventory'); }} />}
                         {view === 'inventory' && <InventoryView {...dataProps} setRawOutput={setRawOutput} setIsRawOutputModalOpen={setIsRawOutputModalOpen} />}
                         {view === 'rack' && <RackView inventory={inventory} onDeviceMove={handleDeviceMove} modelsMap={modelsMap} />}
-                        {view === 'dataline' && <DatalineView />}
+                        {view === 'dataline' && <DatalineView onEdit={(item) => { setEditingDataline(item); setIsDatalineModalOpen(true); }} />}
                         {view === 'settings' && <SettingsView options={options} onDataUpdated={fetchData} currentUser={user} />}
                         {view === 'logs' && <LogsView />}
 
                         {isDeviceModalOpen && <DeviceModal isOpen={true} onClose={()=>{setIsDeviceModalOpen(false); setEditingDevice(null);}} onSave={(fd)=>{ const p = editingDevice ? {...fd, id:editingDevice.id} : fd; handleSaveDevice(p); }} options={options} initialData={editingDevice} />}
                         {isImportOpen && <ImportModal onClose={()=>setIsImportOpen(false)} onDataUpdated={fetchData} endpoint="api/import.php" templateCsv={"Hostname,IP,Serial,Type,Brand,Model,Location,Rack,RackPosition,Status\nSW1,1.1.1.1,SN123,Switch,Cisco,C9300,Datacenter,A1,U42,Active"} title="Import Inventory CSV" />}
+                        {isDatalineModalOpen && <DatalineModal isOpen={true} onClose={() => { setIsDatalineModalOpen(false); setEditingDataline(null); }} onSave={handleSaveDataline} initialData={editingDataline} />}
                         {isRawOutputModalOpen && <RawOutputModal isOpen={true} onClose={() => setIsRawOutputModalOpen(false)} output={rawOutput} />}
                     </Layout>
                 </ToastProvider>
